@@ -187,70 +187,68 @@ export const applyRecurringExpenses = async (): Promise<number> => {
   const today = startOfDay(new Date());
   let expensesAddedCount = 0;
 
-  const tx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
-  const expenseStore = tx.objectStore(EXPENSE_STORE);
-  const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
-  
-  const processingPromises: Promise<void>[] = [];
-
   for (const re of recurringExpenses) {
-    let nextDueDate = startOfDay(new Date(re.startDate));
-    const lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
+      let nextDueDate = startOfDay(new Date(re.startDate));
+      const lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
 
-    if (lastApplied) {
-      if (re.frequency === 'monthly') {
-        nextDueDate = addMonths(lastApplied, 1);
-      } else if (re.frequency === 'yearly') {
-        nextDueDate = addYears(lastApplied, 1);
+      // If lastAppliedDate exists, calculate the next due date from there
+      if (lastApplied) {
+          if (re.frequency === 'monthly') {
+              nextDueDate = addMonths(lastApplied, 1);
+          } else if (re.frequency === 'yearly') {
+              nextDueDate = addYears(lastApplied, 1);
+          }
       }
-    }
-    
-    while (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
-        const currentDueDate = new Date(nextDueDate.getTime());
-        const processingPromise = new Promise<void>((resolve, reject) => {
-            const expenseId = `${re.id}-${currentDueDate.toISOString().split('T')[0]}`;
-            const checkRequest = expenseStore.get(expenseId);
+      
+      // Keep adding expenses until the next due date is in the future
+      while (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
+          const expenseId = `${re.id}-${nextDueDate.toISOString().split('T')[0]}`;
+          
+          const txCheck = db.transaction(EXPENSE_STORE, 'readonly');
+          const expenseStoreCheck = txCheck.objectStore(EXPENSE_STORE);
+          const checkRequest = expenseStoreCheck.get(expenseId);
 
-            checkRequest.onsuccess = () => {
-                if (!checkRequest.result) {
-                    const newExpense: Expense = {
-                        id: expenseId,
-                        title: re.title,
-                        amount: re.amount,
-                        date: currentDueDate.toISOString(),
-                    };
-                    expenseStore.add(newExpense);
+          const alreadyExists = await new Promise<boolean>((resolve, reject) => {
+              checkRequest.onsuccess = () => resolve(!!checkRequest.result);
+              checkRequest.onerror = () => reject(checkRequest.error);
+          });
+          
+          if (!alreadyExists) {
+              const txAdd = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
+              const expenseStoreAdd = txAdd.objectStore(EXPENSE_STORE);
+              const recurringExpenseStoreUpdate = txAdd.objectStore(RECURRING_EXPENSE_STORE);
 
-                    const updatedRecurringExpense = { ...re, lastAppliedDate: currentDueDate.toISOString() };
-                    recurringExpenseStore.put(updatedRecurringExpense);
-                    
-                    expensesAddedCount++;
-                }
-                resolve();
-            };
-            checkRequest.onerror = () => reject(checkRequest.error);
-        });
+              const newExpense: Expense = {
+                  id: expenseId,
+                  title: re.title,
+                  amount: re.amount,
+                  date: nextDueDate.toISOString(),
+              };
+              expenseStoreAdd.add(newExpense);
+              expensesAddedCount++;
+              
+              const updatedRecurringExpense = { ...re, lastAppliedDate: nextDueDate.toISOString() };
+              recurringExpenseStoreUpdate.put(updatedRecurringExpense);
 
-        processingPromises.push(processingPromise);
+              await new Promise<void>((resolve, reject) => {
+                  txAdd.oncomplete = () => resolve();
+                  txAdd.onerror = () => reject(txAdd.error);
+              });
 
-        if (re.frequency === 'monthly') {
-            nextDueDate = addMonths(nextDueDate, 1);
-        } else if (re.frequency === 'yearly') {
-            nextDueDate = addYears(nextDueDate, 1);
-        }
-    }
+              // Update the recurring expense object for the next iteration in the loop
+              re.lastAppliedDate = nextDueDate.toISOString();
+          }
+           
+          // Calculate next due date for the next loop iteration
+          if (re.frequency === 'monthly') {
+              nextDueDate = addMonths(nextDueDate, 1);
+          } else {
+              nextDueDate = addYears(nextDueDate, 1);
+          }
+      }
   }
 
-  await Promise.all(processingPromises);
-  
-  return new Promise<number>((resolve, reject) => {
-      tx.oncomplete = () => {
-          resolve(expensesAddedCount);
-      };
-      tx.onerror = () => {
-          reject(tx.error);
-      };
-  });
+  return expensesAddedCount;
 };
 
 
@@ -408,7 +406,7 @@ export const deleteProduct = (id: string): Promise<void> => {
 };
 
 // Sale Operations
-export const addSale = async (saleData: Pick<Sale, 'total' | 'customerId' | 'customerName' | 'payments' | 'date'> & { items: Omit<SaleItem, 'totalCost'>[] }, newCustomerName?: string): Promise<void> => {
+export const addSale = async (saleData: Omit<Sale, 'id' | 'items'> & { items: Omit<SaleItem, 'totalCost'>[] }, newCustomerName?: string): Promise<void> => {
     const db = await openDB();
     const tx = db.transaction([SALE_STORE, PRODUCT_STORE, CUSTOMER_STORE, SETTINGS_STORE], 'readwrite');
     const saleStore = tx.objectStore(SALE_STORE);
