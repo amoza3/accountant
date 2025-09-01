@@ -44,6 +44,7 @@ import type { SaleItem, Customer, PaymentMethod } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 export default function RecordSalePage() {
   const [cart, setCart] = useState<SaleItem[]>([]);
