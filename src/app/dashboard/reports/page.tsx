@@ -111,7 +111,11 @@ export default function ReportsPage() {
 
     filteredSales.forEach(sale => {
       const dateKey = format(new Date(sale.date), dateFormat);
-      const saleProfit = sale.items.reduce((acc, item) => acc + (item.price * item.quantity - item.totalCost), 0);
+      const saleProfit = sale.items.reduce((acc, item) => {
+          const itemRevenue = item.price * item.quantity;
+          const itemCost = item.totalCost || 0; // Fallback to 0 if totalCost is not available
+          return acc + (itemRevenue - itemCost);
+      }, 0);
       
       const current = dataMap.get(dateKey) || { فروش: 0, 'سود ناخالص': 0, مخارج: 0 };
       current.فروش += sale.total;
@@ -139,7 +143,11 @@ export default function ReportsPage() {
 
   const { totalSales, totalGrossProfit, totalExpenses, totalNetProfit } = useMemo(() => {
     const grossProfit = filteredSales.reduce((total, sale) => {
-        const saleProfit = sale.items.reduce((acc, item) => acc + (item.price * item.quantity - item.totalCost), 0);
+        const saleProfit = sale.items.reduce((acc, item) => {
+            const itemRevenue = item.price * item.quantity;
+            const itemCost = item.totalCost || 0; // Fallback to 0
+            return acc + (itemRevenue - itemCost);
+        }, 0);
         return total + saleProfit;
     }, 0);
     const expenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -279,3 +287,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

@@ -120,19 +120,22 @@ export const applyRecurringExpenses = async (): Promise<number> => {
     for (const re of recurringExpenses) {
         let lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
         let nextDueDate = startOfDay(new Date(re.startDate));
-        
+
+        // If it was applied before, calculate the next due date from the last applied date
         if (lastApplied) {
-            // Calculate next due date based on last applied date
-            if (re.frequency === 'monthly') {
+             if (re.frequency === 'monthly') {
                 nextDueDate = addMonths(lastApplied, 1);
             } else if (re.frequency === 'yearly') {
                 nextDueDate = addYears(lastApplied, 1);
             }
         }
         
+        // Loop through all due dates from the calculated nextDueDate up to today
         while (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
-            const expenseId = `${re.id}-${nextDueDate.toISOString()}`;
-            const existingExpense = await new Promise<Expense | undefined>((resolve, reject) => {
+             const expenseId = `${re.id}-${nextDueDate.toISOString()}`;
+             
+             // Check if this specific expense instance has already been added
+             const existingExpense = await new Promise<Expense | undefined>((resolve, reject) => {
                 const store = getStore(EXPENSE_STORE, 'readonly');
                 const req = store.get(expenseId);
                 req.onsuccess = () => resolve(req.result);
@@ -150,14 +153,16 @@ export const applyRecurringExpenses = async (): Promise<number> => {
                 expensesAddedCount++;
             }
             
+            // Update the lastAppliedDate for the recurring expense to the one we just processed
             const updatedRecurringExpense = { ...re, lastAppliedDate: nextDueDate.toISOString() };
             await updateRecurringExpense(updatedRecurringExpense);
             
-            // Calculate the next due date for the while loop
-            if (re.frequency === 'monthly') {
-                nextDueDate = addMonths(nextDueDate, 1);
+            // Set up for the next iteration of the while loop
+            lastApplied = nextDueDate;
+             if (re.frequency === 'monthly') {
+                nextDueDate = addMonths(lastApplied, 1);
             } else if (re.frequency === 'yearly') {
-                nextDueDate = addYears(nextDueDate, 1);
+                nextDueDate = addYears(lastApplied, 1);
             }
         }
     }
@@ -466,3 +471,5 @@ export const deleteCostTitle = (id: string): Promise<void> => {
         request.onerror = () => reject(request.error);
     });
 };
+
+    
