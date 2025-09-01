@@ -319,7 +319,7 @@ export default function AddProductPage() {
                             {calculatedPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
                         </p>
                          <FormDescription>
-                            این قیمت بر اساس مجموع هزینه‌ها و حاشیه سود محاسبه می‌شود.
+                            این قیمت بر اساس مجموع هزینه‌ها (شامل: {calculateTotalCostInToman(watchedValues.costs, exchangeRates).toLocaleString('fa-IR')} تومان) و حاشیه سود ({watchedValues.profitMargin}٪) محاسبه می‌شود.
                         </FormDescription>
                     </div>
                 </div>

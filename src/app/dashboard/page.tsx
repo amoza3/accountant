@@ -60,6 +60,7 @@ function EditProductForm({
   const [quantity, setQuantity] = useState(product.quantity);
   const [lowStockThreshold, setLowStockThreshold] = useState(product.lowStockThreshold);
   const [profitMargin, setProfitMargin] = useState(product.profitMargin);
+  const [barcode, setBarcode] = useState(product.id);
 
   const totalCost = useMemo(() => calculateTotalCostInToman(product.costs, exchangeRates)
   , [product.costs, exchangeRates]);
@@ -72,8 +73,9 @@ function EditProductForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateProduct({ 
+      await updateProduct(product.id, { 
         ...product, 
+        id: barcode,
         name, 
         quantity, 
         lowStockThreshold,
@@ -96,6 +98,10 @@ function EditProductForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+       <div>
+        <Label htmlFor="edit-barcode">بارکد (شناسه)</Label>
+        <Input id="edit-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} required />
+      </div>
       <div>
         <Label htmlFor="edit-name">نام محصول</Label>
         <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />

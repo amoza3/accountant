@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   FileText,
   Settings,
+  History
 } from 'lucide-react';
 import {
   Sidebar,
@@ -37,6 +38,11 @@ export function MainSidebar({ appName }: { appName: string }) {
       href: `/dashboard/record-sale`,
       label: 'ثبت فروش',
       icon: ShoppingCart,
+    },
+     {
+      href: `/dashboard/sales-history`,
+      label: 'تاریخچه فروش',
+      icon: History,
     },
     {
       href: `/dashboard/reports`,

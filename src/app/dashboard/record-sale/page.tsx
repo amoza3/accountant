@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,36 +32,37 @@ export default function RecordSalePage() {
   const barcodeRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     barcodeRef.current?.focus();
   }, []);
 
-  const handleBarcodeSubmit = async () => {
-    if (!barcode) return;
+  const handleBarcodeAdd = useCallback(async (scannedBarcode: string) => {
+    if (!scannedBarcode) return;
 
     try {
-      const product = await getProductById(barcode);
+      const product = await getProductById(scannedBarcode);
       if (product) {
-        if(product.quantity <= 0) {
-            toast({
-                variant: 'destructive',
-                title: 'موجودی تمام شد',
-                description: `موجودی '${product.name}' به اتمام رسیده است.`,
-            });
-            return;
+        if (product.quantity <= 0) {
+          toast({
+            variant: 'destructive',
+            title: 'موجودی تمام شد',
+            description: `موجودی '${product.name}' به اتمام رسیده است.`,
+          });
+          return;
         }
 
         setCart((prevCart) => {
           const existingItem = prevCart.find((item) => item.productId === product.id);
           if (existingItem) {
             if (existingItem.quantity >= product.quantity) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تعداد بیش از موجودی',
-                    description: `امکان افزودن تعداد بیشتری از '${product.name}' وجود ندارد.`,
-                });
-                return prevCart;
+              toast({
+                variant: 'destructive',
+                title: 'تعداد بیش از موجودی',
+                description: `امکان افزودن تعداد بیشتری از '${product.name}' وجود ندارد.`,
+              });
+              return prevCart;
             }
             return prevCart.map((item) =>
               item.productId === product.id
@@ -84,7 +85,7 @@ export default function RecordSalePage() {
         toast({
           variant: 'destructive',
           title: 'محصول یافت نشد',
-          description: `محصولی با بارکد ${barcode} یافت نشد.`,
+          description: `محصولی با بارکد ${scannedBarcode} یافت نشد.`,
         });
       }
     } catch (error) {
@@ -97,14 +98,23 @@ export default function RecordSalePage() {
       setBarcode('');
       barcodeRef.current?.focus();
     }
+  }, [toast]);
+
+  const handleBarcodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newBarcode = e.target.value;
+    setBarcode(newBarcode);
+    startTransition(() => {
+        handleBarcodeAdd(newBarcode);
+    });
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleBarcodeSubmit();
+      handleBarcodeAdd(barcode);
     }
   };
+
 
   const updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -158,7 +168,7 @@ export default function RecordSalePage() {
         <Card>
           <CardHeader>
             <CardTitle>فروش فعلی</CardTitle>
-            <CardDescription>برای افزودن کالاها به فروش، بارکد را اسکن کنید.</CardDescription>
+            <CardDescription>برای افزودن کالاها به فروش، بارکد را اسکن یا وارد کنید.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="relative mb-4">
@@ -166,9 +176,9 @@ export default function RecordSalePage() {
               <Input
                 ref={barcodeRef}
                 value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
+                onChange={handleBarcodeChange}
                 onKeyDown={handleKeyDown}
-                placeholder="بارکد را اسکن کرده و Enter را بزنید"
+                placeholder="بارکد را اسکن یا وارد کنید..."
                 className="pr-10"
               />
             </div>

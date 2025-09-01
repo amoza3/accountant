@@ -85,13 +85,24 @@ export const getProductById = (id: string): Promise<Product | undefined> => {
 };
 
 
-export const updateProduct = (product: Product): Promise<void> => {
+export const updateProduct = (originalId: string, product: Product): Promise<void> => {
   return new Promise(async (resolve, reject) => {
     const db = await openDB();
     const store = getStore(PRODUCT_STORE, 'readwrite');
-    const request = store.put(product);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    // If the ID has changed, we need to delete the old record and add a new one.
+    if (originalId !== product.id) {
+      const deleteRequest = store.delete(originalId);
+      deleteRequest.onsuccess = () => {
+        const addRequest = store.add(product);
+        addRequest.onsuccess = () => resolve();
+        addRequest.onerror = () => reject(addRequest.error);
+      };
+      deleteRequest.onerror = () => reject(deleteRequest.error);
+    } else {
+      const request = store.put(product);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    }
   });
 };
 
