@@ -7,14 +7,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function calculateTotalCostInToman(costs: ProductCost[], rates: ExchangeRate[]): number {
-  if (!costs) return 0;
+  if (!costs || !Array.isArray(costs)) return 0;
   return costs.reduce((total, cost) => {
     const amount = Number(cost.amount) || 0;
     if (cost.currency === 'TOMAN') {
       return total + amount;
     }
     const rateInfo = rates.find(r => r.currency === cost.currency);
-    const rate = rateInfo ? Number(rateInfo.rate) : 0;
+    const rate = rateInfo ? Number(rateInfo.rate) : 1;
     return total + (amount * rate);
   }, 0);
 };
@@ -23,7 +23,7 @@ export function calculateSellingPrice(product: Product, rates: ExchangeRate[]): 
   const totalCost = calculateTotalCostInToman(product.costs, rates);
   const profitMargin = Number(product.profitMargin) || 0;
   const profit = totalCost * (profitMargin / 100);
-  return totalCost + profit;
+  return Math.round(totalCost + profit);
 }
 
 export const CURRENCY_SYMBOLS: Record<Currency, string> = {
