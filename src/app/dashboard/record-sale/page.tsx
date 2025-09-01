@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useTransition, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle, UserPlus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,12 +39,14 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { getProductById, addSale, getAllCustomers } from '@/lib/db';
-import type { SaleItem, Customer, PaymentMethod } from '@/lib/types';
+import { getProductById, addSale, getAllCustomers, getAllProducts } from '@/lib/db';
+import type { SaleItem, Customer, PaymentMethod, Product } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { CURRENCY_SYMBOLS } from '@/lib/utils';
 
 export default function RecordSalePage() {
   const [cart, setCart] = useState<Omit<SaleItem, 'totalCost'>[]>([]);
@@ -52,7 +54,9 @@ export default function RecordSalePage() {
   const barcodeRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -68,56 +72,64 @@ export default function RecordSalePage() {
 
   useEffect(() => {
     barcodeRef.current?.focus();
-    async function fetchCustomers() {
-        const allCustomers = await getAllCustomers();
-        setCustomers(allCustomers);
+    async function fetchData() {
+        const [customers, products] = await Promise.all([
+            getAllCustomers(),
+            getAllProducts()
+        ]);
+        setCustomers(customers);
+        setAllProducts(products);
     }
-    fetchCustomers();
+    fetchData();
   }, []);
 
-  const handleBarcodeAdd = useCallback(async (scannedBarcode: string) => {
+  const handleAddProductToCart = useCallback((product: Product) => {
+     if (product.quantity <= 0) {
+        toast({
+            variant: 'destructive',
+            title: 'موجودی تمام شد',
+            description: `موجودی '${product.name}' به اتمام رسیده است.`,
+        });
+        return;
+    }
+
+    setCart((prevCart) => {
+        const existingItem = prevCart.find((item) => item.productId === product.id);
+        if (existingItem) {
+        if (existingItem.quantity >= product.quantity) {
+            toast({
+                variant: 'destructive',
+                title: 'تعداد بیش از موجودی',
+                description: `امکان افزودن تعداد بیشتری از '${product.name}' وجود ندارد.`,
+            });
+            return prevCart;
+        }
+        return prevCart.map((item) =>
+            item.productId === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+        } else {
+        return [
+            ...prevCart,
+            {
+            productId: product.id,
+            productName: product.name,
+            quantity: 1,
+            price: product.price,
+            },
+        ];
+        }
+    });
+  }, [toast]);
+
+  const handleBarcodeAdd = async (scannedBarcode: string) => {
     if (!scannedBarcode) return;
 
     try {
       const product = await getProductById(scannedBarcode);
       if (product) {
-        if (product.quantity <= 0) {
-          toast({
-            variant: 'destructive',
-            title: 'موجودی تمام شد',
-            description: `موجودی '${product.name}' به اتمام رسیده است.`,
-          });
-          return;
-        }
-
-        setCart((prevCart) => {
-          const existingItem = prevCart.find((item) => item.productId === product.id);
-          if (existingItem) {
-            if (existingItem.quantity >= product.quantity) {
-              toast({
-                variant: 'destructive',
-                title: 'تعداد بیش از موجودی',
-                description: `امکان افزودن تعداد بیشتری از '${product.name}' وجود ندارد.`,
-              });
-              return prevCart;
-            }
-            return prevCart.map((item) =>
-              item.productId === product.id
-                ? { ...item, quantity: item.quantity + 1 }
-                : item
-            );
-          } else {
-            return [
-              ...prevCart,
-              {
-                productId: product.id,
-                productName: product.name,
-                quantity: 1,
-                price: product.price,
-              },
-            ];
-          }
-        });
+        handleAddProductToCart(product);
       } else {
         toast({
           variant: 'destructive',
@@ -135,15 +147,8 @@ export default function RecordSalePage() {
       setBarcode('');
       barcodeRef.current?.focus();
     }
-  }, [toast]);
-
-  const handleBarcodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newBarcode = e.target.value;
-    setBarcode(newBarcode);
-    startTransition(() => {
-        handleBarcodeAdd(newBarcode);
-    });
   };
+
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -217,27 +222,24 @@ export default function RecordSalePage() {
     );
   }, [customerSearch, customers]);
 
+  const filteredProducts = useMemo(() => {
+    return allProducts.filter(
+        product => product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+                   product.id.toLowerCase().includes(productSearchTerm.toLowerCase())
+    );
+  }, [allProducts, productSearchTerm]);
+
 
   return (
-    <div className="grid md:grid-cols-3 gap-8">
-      <div className="md:col-span-2">
+    <div className="grid md:grid-cols-5 gap-8 items-start">
+        {/* Cart and Summary - Left Column */}
+      <div className="md:col-span-3">
         <Card>
           <CardHeader>
-            <CardTitle>فروش فعلی</CardTitle>
-            <CardDescription>برای افزودن کالاها به فروش، بارکد را اسکن یا وارد کنید.</CardDescription>
+            <CardTitle>سبد خرید</CardTitle>
+            <CardDescription>محصولات انتخاب شده برای این فروش</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="relative mb-4">
-              <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                ref={barcodeRef}
-                value={barcode}
-                onChange={handleBarcodeChange}
-                onKeyDown={handleKeyDown}
-                placeholder="بارکد را اسکن یا وارد کنید..."
-                className="pr-10"
-              />
-            </div>
             <div className="border rounded-md min-h-[300px]">
               <Table>
                 <TableHeader>
@@ -280,94 +282,140 @@ export default function RecordSalePage() {
                 </TableBody>
               </Table>
             </div>
+            <Separator className="my-6"/>
+            <Card className="sticky top-8">
+                <CardHeader>
+                    <CardTitle>خلاصه و پرداخت</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label>مشتری</Label>
+                        <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" aria-expanded={isCustomerPopoverOpen} className="w-full justify-between">
+                                    {selectedCustomer ? selectedCustomer.name : 'انتخاب مشتری...'}
+                                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0">
+                                <Command>
+                                    <CommandInput 
+                                        placeholder="جستجوی نام یا شماره مشتری..."
+                                        value={customerSearch}
+                                        onValueChange={setCustomerSearch}
+                                    />
+                                    <CommandList>
+                                        {filteredCustomers.length === 0 && customerSearch && (
+                                            <CommandItem
+                                                onSelect={() => {
+                                                    setSelectedCustomer({ id: '', name: customerSearch });
+                                                    setIsCustomerPopoverOpen(false);
+                                                }}
+                                                className="flex items-center gap-2"
+                                            >
+                                                <UserPlus className="h-4 w-4" />
+                                                <span>افزودن مشتری جدید: "{customerSearch}"</span>
+                                            </CommandItem>
+                                        )}
+                                        {filteredCustomers.map((customer) => (
+                                        <CommandItem
+                                            key={customer.id}
+                                            value={customer.name}
+                                            onSelect={() => {
+                                                setSelectedCustomer(customer);
+                                                setCustomerSearch(customer.name);
+                                                setIsCustomerPopoverOpen(false);
+                                            }}
+                                        >
+                                            {customer.name} {customer.phone && `(${customer.phone})`}
+                                        </CommandItem>
+                                        ))}
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    
+                    <div>
+                        <Label>روش پرداخت</Label>
+                        <Select value={paymentMethod} onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="روش پرداخت را انتخاب کنید" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(paymentMethodLabels).map(([method, label]) => (
+                                    <SelectItem key={method} value={method}>{label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Separator/>
+
+                    <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">تعداد اقلام</span>
+                    <span>{cart.reduce((acc, item) => acc + item.quantity, 0)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-2xl font-bold">
+                    <span>جمع کل</span>
+                    <Badge className="text-2xl" variant="secondary">{total.toLocaleString('fa-IR')} تومان</Badge>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button className="w-full" size="lg" onClick={completeSale}>
+                    <ShoppingCart className="mr-2 h-5 w-5" /> تکمیل فروش
+                    </Button>
+                </CardFooter>
+            </Card>
           </CardContent>
         </Card>
       </div>
 
-      <div className="md:col-span-1">
-        <Card className="sticky top-8">
-          <CardHeader>
-            <CardTitle>خلاصه</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-
-             <div>
-                <Label>مشتری</Label>
-                 <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" aria-expanded={isCustomerPopoverOpen} className="w-full justify-between">
-                            {selectedCustomer ? selectedCustomer.name : 'انتخاب مشتری...'}
-                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                        <Command>
-                            <CommandInput 
-                                placeholder="جستجوی نام یا شماره مشتری..."
-                                value={customerSearch}
-                                onValueChange={setCustomerSearch}
-                            />
-                            <CommandList>
-                                {filteredCustomers.length === 0 && customerSearch && (
-                                    <CommandItem
-                                        onSelect={() => {
-                                            setSelectedCustomer({ id: '', name: customerSearch });
-                                            setIsCustomerPopoverOpen(false);
-                                        }}
-                                        className="flex items-center gap-2"
-                                    >
-                                        <UserPlus className="h-4 w-4" />
-                                        <span>افزودن مشتری جدید: "{customerSearch}"</span>
-                                    </CommandItem>
-                                )}
-                                {filteredCustomers.map((customer) => (
-                                <CommandItem
-                                    key={customer.id}
-                                    value={customer.name}
-                                    onSelect={() => {
-                                        setSelectedCustomer(customer);
-                                        setCustomerSearch(customer.name);
-                                        setIsCustomerPopoverOpen(false);
-                                    }}
-                                >
-                                    {customer.name} {customer.phone && `(${customer.phone})`}
-                                </CommandItem>
-                                ))}
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                 </Popover>
-            </div>
-            
-            <div>
-                <Label>روش پرداخت</Label>
-                <Select value={paymentMethod} onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="روش پرداخت را انتخاب کنید" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {Object.entries(paymentMethodLabels).map(([method, label]) => (
-                            <SelectItem key={method} value={method}>{label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <Separator/>
-
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">تعداد اقلام</span>
-              <span>{cart.reduce((acc, item) => acc + item.quantity, 0)}</span>
-            </div>
-             <div className="flex justify-between items-center text-2xl font-bold">
-              <span>جمع کل</span>
-              <Badge className="text-2xl" variant="secondary">{total.toLocaleString('fa-IR')} تومان</Badge>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full" size="lg" onClick={completeSale}>
-              <ShoppingCart className="mr-2 h-5 w-5" /> تکمیل فروش
-            </Button>
-          </CardFooter>
+       {/* Product List - Right Column */}
+      <div className="md:col-span-2">
+        <Card>
+            <CardHeader>
+                <CardTitle>لیست محصولات</CardTitle>
+                <CardDescription>محصولات را برای افزودن به سبد خرید جستجو و انتخاب کنید.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 <div className="relative">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                        placeholder="جستجوی محصول..."
+                        value={productSearchTerm}
+                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                        className="pr-10"
+                    />
+                </div>
+                 <div className="relative">
+                    <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                        ref={barcodeRef}
+                        value={barcode}
+                        onChange={(e) => setBarcode(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="یا بارکد را اسکن کنید..."
+                        className="pr-10"
+                    />
+                </div>
+                <ScrollArea className="h-[60vh] border rounded-md">
+                   <div className="p-2">
+                     {filteredProducts.length > 0 ? (
+                        filteredProducts.map(product => (
+                            <div key={product.id} onClick={() => handleAddProductToCart(product)} className="flex justify-between items-center p-2 rounded-md hover:bg-muted cursor-pointer">
+                                <div>
+                                    <p className="font-semibold">{product.name}</p>
+                                    <p className="text-sm text-muted-foreground">موجودی: {product.quantity}</p>
+                                </div>
+                                <span className="font-mono">{product.price.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
+                            </div>
+                        ))
+                     ) : (
+                         <div className="text-center text-muted-foreground p-4">محصولی یافت نشد.</div>
+                     )}
+                   </div>
+                </ScrollArea>
+            </CardContent>
         </Card>
       </div>
     </div>
