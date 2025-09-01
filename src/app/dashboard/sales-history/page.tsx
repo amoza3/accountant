@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getAllSales } from '@/lib/db';
-import type { Sale } from '@/lib/types';
+import type { Sale, PaymentMethod } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -17,10 +17,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CURRENCY_SYMBOLS } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+    CASH: 'نقد',
+    CARD: 'کارتخوان',
+    ONLINE: 'آنلاین',
+};
 
 export default function SalesHistoryPage() {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -50,6 +57,7 @@ export default function SalesHistoryPage() {
       <Card>
         <CardHeader>
             <CardTitle>فروش‌های ثبت‌شده</CardTitle>
+            <CardDescription>برای دیدن جزئیات هر فروش، روی آن کلیک کنید.</CardDescription>
         </CardHeader>
         <CardContent>
             <ScrollArea className="h-[60vh]">
@@ -58,15 +66,22 @@ export default function SalesHistoryPage() {
                     {sales.map((sale) => (
                     <AccordionItem value={`sale-${sale.id}`} key={sale.id}>
                         <AccordionTrigger>
-                        <div className="flex justify-between w-full pr-4">
-                            <span>
-                            فروش شماره {sale.id} -{' '}
-                            {new Date(sale.date).toLocaleDateString('fa-IR')}
-                            </span>
-                            <span className="font-semibold">
-                            مبلغ کل: {sale.total.toLocaleString('fa-IR')}{' '}
-                            {CURRENCY_SYMBOLS.TOMAN}
-                            </span>
+                        <div className="flex justify-between items-center w-full pr-4">
+                            <div className="flex flex-col items-start gap-1">
+                                <span className="font-semibold">
+                                فروش در تاریخ {new Date(sale.date).toLocaleDateString('fa-IR')}
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                    مشتری: {sale.customerName || 'ناشناس'}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <Badge variant="outline">{paymentMethodLabels[sale.paymentMethod]}</Badge>
+                                <span className="font-semibold text-lg">
+                                    {sale.total.toLocaleString('fa-IR')}{' '}
+                                    {CURRENCY_SYMBOLS.TOMAN}
+                                </span>
+                            </div>
                         </div>
                         </AccordionTrigger>
                         <AccordionContent>

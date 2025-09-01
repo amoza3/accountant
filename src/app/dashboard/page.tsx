@@ -8,8 +8,9 @@ import {
   deleteProduct,
   updateProduct,
   getExchangeRates,
+  getCostTitles
 } from '@/lib/db';
-import type { Product, ExchangeRate } from '@/lib/types';
+import type { Product, ExchangeRate, CostTitle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,48 +44,93 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { calculateTotalCostInToman, CURRENCY_SYMBOLS } from '@/lib/utils';
+import { calculateTotalCostInToman, CURRENCY_SYMBOLS, calculateSellingPrice } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+const productSchema = z.object({
+  id: z.string().min(1, 'بارکد الزامی است'),
+  name: z.string().min(1, 'نام محصول الزامی است'),
+  quantity: z.coerce.number().min(0, 'تعداد نمی‌تواند منفی باشد'),
+  lowStockThreshold: z.coerce.number().min(0, 'آستانه نمی‌تواند منفی باشد'),
+  profitMargin: z.coerce.number().min(0, 'حاشیه سود نمی‌تواند منفی باشد'),
+  costs: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      amount: z.coerce.number().min(0, 'مبلغ نمی‌تواند منفی باشد'),
+      currency: z.enum(['TOMAN', 'USD', 'AED', 'CNY']),
+    })
+  ),
+});
+
 
 function EditProductForm({
   product,
   onSuccess,
   exchangeRates,
+  costTitles
 }: {
   product: Product;
   onSuccess: () => void;
   exchangeRates: ExchangeRate[];
+  costTitles: CostTitle[];
 }) {
   const { toast } = useToast();
-  const [name, setName] = useState(product.name);
-  const [quantity, setQuantity] = useState(product.quantity);
-  const [lowStockThreshold, setLowStockThreshold] = useState(product.lowStockThreshold);
-  const [profitMargin, setProfitMargin] = useState(product.profitMargin);
-  const [barcode, setBarcode] = useState(product.id);
+  const [calculatedPrice, setCalculatedPrice] = useState(product.price);
+  
+  const form = useForm<z.infer<typeof productSchema>>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      ...product,
+    },
+  });
 
-  const totalCost = useMemo(() => calculateTotalCostInToman(product.costs, exchangeRates)
-  , [product.costs, exchangeRates]);
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "costs",
+  });
 
-  const sellingPrice = useMemo(() => {
-    const profit = totalCost * (profitMargin / 100);
-    return totalCost + profit;
-  }, [totalCost, profitMargin]);
+  const watchedValues = form.watch();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    const productData = {
+        ...watchedValues,
+        price: 0
+    } as Product
+    const newPrice = calculateSellingPrice(productData, exchangeRates);
+    setCalculatedPrice(newPrice);
+  }, [watchedValues, exchangeRates]);
+
+
+  const handleSubmit = async (data: z.infer<typeof productSchema>) => {
     try {
+      const finalPrice = calculateSellingPrice({...data, price: 0} as Product, exchangeRates);
       await updateProduct(product.id, { 
-        ...product, 
-        id: barcode,
-        name, 
-        quantity, 
-        lowStockThreshold,
-        profitMargin,
-        price: sellingPrice
+        ...data,
+        price: finalPrice
       });
       toast({
         title: 'محصول ویرایش شد',
-        description: `${name} با موفقیت به‌روزرسانی شد.`,
+        description: `${data.name} با موفقیت به‌روزرسانی شد.`,
       });
       onSuccess();
     } catch (error) {
@@ -97,37 +143,159 @@ function EditProductForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-       <div>
-        <Label htmlFor="edit-barcode">بارکد (شناسه)</Label>
-        <Input id="edit-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} required />
-      </div>
-      <div>
-        <Label htmlFor="edit-name">نام محصول</Label>
-        <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />
-      </div>
+    <Form {...form}>
+    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto p-4">
+      <FormField
+        control={form.control}
+        name="id"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>بارکد (شناسه)</FormLabel>
+            <FormControl>
+              <Input {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name="name"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>نام محصول</FormLabel>
+            <FormControl>
+              <Input {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
       <div className="grid grid-cols-2 gap-4">
-        <div>
-            <Label htmlFor="edit-quantity">تعداد</Label>
-            <Input id="edit-quantity" type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} required />
+        <FormField
+          control={form.control}
+          name="quantity"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>تعداد</FormLabel>
+              <FormControl>
+                <Input type="number" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="lowStockThreshold"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>آستانه هشدار موجودی</FormLabel>
+              <FormControl>
+                <Input type="number" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <Separator />
+
+        <div className="space-y-4">
+            <h3 className="text-lg font-medium">هزینه‌های محصول</h3>
+            {fields.map((field, index) => (
+                <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
+                    <FormField
+                    control={form.control}
+                    name={`costs.${index}.title`}
+                    render={({ field: selectField }) => (
+                        <FormItem className="w-1/3">
+                            <FormLabel>عنوان هزینه</FormLabel>
+                            <Select onValueChange={selectField.onChange} defaultValue={selectField.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="یک عنوان انتخاب کنید" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                {costTitles.map(ct => (
+                                    <SelectItem key={ct.id} value={ct.title}>{ct.title}</SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name={`costs.${index}.amount`}
+                    render={({ field }) => (
+                        <FormItem className="w-1/3">
+                        <FormLabel>مبلغ</FormLabel>
+                        <FormControl><Input type="number" placeholder="100" {...field} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name={`costs.${index}.currency`}
+                    render={({ field }) => (
+                        <FormItem className="w-1/3">
+                        <FormLabel>ارز</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger><SelectValue placeholder="ارز را انتخاب کنید" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
+                                <SelectItem key={code} value={code}>{code} ({symbol})</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                    <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+            ))}
+            <Button
+                type="button"
+                variant="outline"
+                onClick={() => append({ id: Date.now().toString(), title: costTitles[0]?.title || '', amount: 0, currency: 'TOMAN' })}
+            >
+                <PlusCircle className="mr-2 h-4 w-4" /> افزودن هزینه
+            </Button>
         </div>
-        <div>
-            <Label htmlFor="edit-lowStockThreshold">آستانه هشدار موجودی</Label>
-            <Input id="edit-lowStockThreshold" type="number" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(Number(e.target.value))} required />
+
+      <Separator />
+
+      <FormField
+        control={form.control}
+        name="profitMargin"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>حاشیه سود (%)</FormLabel>
+            <FormControl>
+              <Input type="number" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+       <div className="p-4 border rounded-md bg-muted">
+            <p className="text-sm text-muted-foreground">قیمت فروش محاسبه‌شده</p>
+            <p className="text-2xl font-bold">
+                {calculatedPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
+            </p>
         </div>
-      </div>
-      <div>
-        <Label>هزینه تمام‌شده</Label>
-        <p className="font-bold text-lg">{totalCost.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</p>
-      </div>
-       <div>
-        <Label htmlFor="edit-profitMargin">حاشیه سود (%)</Label>
-        <Input id="edit-profitMargin" type="number" value={profitMargin} onChange={(e) => setProfitMargin(Number(e.target.value))} required />
-      </div>
-       <div>
-        <Label>قیمت نهایی فروش</Label>
-        <p className="font-bold text-xl">{sellingPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</p>
-      </div>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">لغو</Button>
@@ -135,6 +303,7 @@ function EditProductForm({
         <Button type="submit">ذخیره تغییرات</Button>
       </DialogFooter>
     </form>
+    </Form>
   );
 }
 
@@ -142,12 +311,14 @@ function ProductCard({
   product,
   onDelete,
   onUpdate,
-  exchangeRates
+  exchangeRates,
+  costTitles
 }: {
   product: Product;
   onDelete: (id: string) => void;
   onUpdate: () => void;
   exchangeRates: ExchangeRate[];
+  costTitles: CostTitle[];
 }) {
   const isLowStock = product.quantity <= product.lowStockThreshold;
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -202,10 +373,15 @@ function ProductCard({
             <DialogHeader>
               <DialogTitle>ویرایش محصول</DialogTitle>
             </DialogHeader>
-            <EditProductForm product={product} exchangeRates={exchangeRates} onSuccess={() => {
-              onUpdate();
-              setIsEditDialogOpen(false);
-            }} />
+            <EditProductForm 
+                product={product} 
+                exchangeRates={exchangeRates} 
+                costTitles={costTitles}
+                onSuccess={() => {
+                    onUpdate();
+                    setIsEditDialogOpen(false);
+                }} 
+            />
           </DialogContent>
         </Dialog>
         <AlertDialog>
@@ -238,13 +414,19 @@ export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
+  const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
   const { toast } = useToast();
 
   const fetchProducts = async () => {
     try {
-      const [allProducts, rates] = await Promise.all([getAllProducts(), getExchangeRates()]);
+      const [allProducts, rates, titles] = await Promise.all([
+        getAllProducts(), 
+        getExchangeRates(),
+        getCostTitles()
+      ]);
       setProducts(allProducts.sort((a, b) => a.name.localeCompare(b.name)));
       setExchangeRates(rates);
+      setCostTitles(titles);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -339,6 +521,7 @@ export default function InventoryPage() {
               onDelete={handleDelete}
               onUpdate={fetchProducts}
               exchangeRates={exchangeRates}
+              costTitles={costTitles}
             />
           ))}
         </div>

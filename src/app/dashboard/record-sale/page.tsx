@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
-import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useTransition, useMemo } from 'react';
+import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle, UserPlus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,11 +20,30 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+    Command,
+    CommandInput,
+    CommandItem,
+    CommandList,
+  } from '@/components/ui/command';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { getProductById, addSale } from '@/lib/db';
-import type { SaleItem } from '@/lib/types';
+import { getProductById, addSale, getAllCustomers } from '@/lib/db';
+import type { SaleItem, Customer, PaymentMethod } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
+import { Label } from '@/components/ui/label';
 
 export default function RecordSalePage() {
   const [cart, setCart] = useState<SaleItem[]>([]);
@@ -34,8 +53,25 @@ export default function RecordSalePage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CARD');
+  
+  const paymentMethodLabels: Record<PaymentMethod, string> = {
+    CASH: 'نقد',
+    CARD: 'کارتخوان',
+    ONLINE: 'آنلاین',
+  };
+
   useEffect(() => {
     barcodeRef.current?.focus();
+    async function fetchCustomers() {
+        const allCustomers = await getAllCustomers();
+        setCustomers(allCustomers);
+    }
+    fetchCustomers();
   }, []);
 
   const handleBarcodeAdd = useCallback(async (scannedBarcode: string) => {
@@ -138,18 +174,29 @@ export default function RecordSalePage() {
     }
 
     try {
+        let newCustomerNameToAdd: string | undefined = undefined;
+        if (customerSearch && !selectedCustomer) {
+            newCustomerNameToAdd = customerSearch;
+        }
+
       await addSale({
         id: Date.now(),
         items: cart,
         total,
         date: new Date().toISOString(),
-      });
+        customerId: selectedCustomer?.id,
+        customerName: selectedCustomer?.name,
+        paymentMethod: paymentMethod,
+      }, newCustomerNameToAdd);
+
       toast({
         title: 'فروش تکمیل شد!',
         description: `فروش به مبلغ ${total.toLocaleString('fa-IR')} تومان با موفقیت ثبت شد.`,
         className: 'bg-accent text-accent-foreground border-accent',
       });
       setCart([]);
+      setSelectedCustomer(null);
+      setCustomerSearch('');
       router.push(`/dashboard`);
     } catch (error) {
       console.error(error);
@@ -160,6 +207,14 @@ export default function RecordSalePage() {
       });
     }
   };
+  
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return customers;
+    return customers.filter(
+        c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+             c.phone?.includes(customerSearch)
+    );
+  }, [customerSearch, customers]);
 
 
   return (
@@ -234,6 +289,70 @@ export default function RecordSalePage() {
             <CardTitle>خلاصه</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+
+             <div>
+                <Label>مشتری</Label>
+                 <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" aria-expanded={isCustomerPopoverOpen} className="w-full justify-between">
+                            {selectedCustomer ? selectedCustomer.name : 'انتخاب مشتری...'}
+                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                            <CommandInput 
+                                placeholder="جستجوی نام یا شماره مشتری..."
+                                value={customerSearch}
+                                onValueChange={setCustomerSearch}
+                            />
+                            <CommandList>
+                                {filteredCustomers.length === 0 && customerSearch && (
+                                    <CommandItem
+                                        onSelect={() => {
+                                            setSelectedCustomer({ id: '', name: customerSearch });
+                                            setIsCustomerPopoverOpen(false);
+                                        }}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <UserPlus className="h-4 w-4" />
+                                        <span>افزودن مشتری جدید: "{customerSearch}"</span>
+                                    </CommandItem>
+                                )}
+                                {filteredCustomers.map((customer) => (
+                                <CommandItem
+                                    key={customer.id}
+                                    value={customer.name}
+                                    onSelect={() => {
+                                        setSelectedCustomer(customer);
+                                        setCustomerSearch(customer.name);
+                                        setIsCustomerPopoverOpen(false);
+                                    }}
+                                >
+                                    {customer.name} {customer.phone && `(${customer.phone})`}
+                                </CommandItem>
+                                ))}
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                 </Popover>
+            </div>
+            
+            <div>
+                <Label>روش پرداخت</Label>
+                <Select value={paymentMethod} onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="روش پرداخت را انتخاب کنید" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {Object.entries(paymentMethodLabels).map(([method, label]) => (
+                            <SelectItem key={method} value={method}>{label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <Separator/>
+
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">تعداد اقلام</span>
               <span>{cart.reduce((acc, item) => acc + item.quantity, 0)}</span>

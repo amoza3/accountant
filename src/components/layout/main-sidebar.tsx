@@ -8,7 +8,8 @@ import {
   ShoppingCart,
   FileText,
   Settings,
-  History
+  History,
+  Users
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,6 +46,11 @@ export function MainSidebar({ appName }: { appName: string }) {
       icon: History,
     },
     {
+        href: `/dashboard/customers`,
+        label: 'مشتریان',
+        icon: Users,
+    },
+    {
       href: `/dashboard/reports`,
       label: 'گزارش‌ها',
       icon: FileText,
@@ -74,7 +80,7 @@ export function MainSidebar({ appName }: { appName: string }) {
         <SidebarMenu>
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href}>
+              <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
                   isActive={isLinkActive(item.href)}
                   tooltip={item.label}

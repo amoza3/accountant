@@ -1,4 +1,5 @@
 export type Currency = 'TOMAN' | 'AED' | 'CNY' | 'USD';
+export type PaymentMethod = 'CASH' | 'CARD' | 'ONLINE';
 
 export interface ProductCost {
   id: string;
@@ -17,6 +18,13 @@ export interface Product {
   profitMargin: number; // Percentage
 }
 
+export interface Customer {
+    id: string;
+    name: string;
+    phone?: string;
+    address?: string;
+}
+
 export interface SaleItem {
   productId: string;
   productName: string;
@@ -29,6 +37,9 @@ export interface Sale {
   items: SaleItem[];
   total: number;
   date: string;
+  customerId?: string;
+  customerName?: string;
+  paymentMethod: PaymentMethod;
 }
 
 export interface ExchangeRate {

@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { addProduct, getProductById, getCostTitles, getExchangeRates } from '@/lib/db';
-import type { Product, CostTitle, ExchangeRate } from '@/lib/types';
+import type { Product, CostTitle, ExchangeRate, ProductCost } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { calculateSellingPrice, CURRENCY_SYMBOLS, calculateTotalCostInToman } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
@@ -137,6 +137,8 @@ export default function AddProductPage() {
       });
     }
   };
+  
+  const totalCost = calculateTotalCostInToman(watchedValues.costs as ProductCost[], exchangeRates);
 
   return (
     <div className="flex justify-center items-start pt-10">
@@ -319,7 +321,7 @@ export default function AddProductPage() {
                             {calculatedPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
                         </p>
                          <FormDescription>
-                            این قیمت بر اساس مجموع هزینه‌ها (شامل: {calculateTotalCostInToman(watchedValues.costs, exchangeRates).toLocaleString('fa-IR')} تومان) و حاشیه سود ({watchedValues.profitMargin}٪) محاسبه می‌شود.
+                            این قیمت بر اساس مجموع هزینه‌ها (شامل: {totalCost.toLocaleString('fa-IR')} تومان) و حاشیه سود ({watchedValues.profitMargin}٪) محاسبه می‌شود.
                         </FormDescription>
                     </div>
                 </div>
