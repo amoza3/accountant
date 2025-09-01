@@ -54,6 +54,14 @@ export interface CostTitle {
   title: string;
 }
 
+export interface Employee {
+  id: string;
+  name: string;
+  position: string;
+  salary: number; // Monthly salary in TOMAN
+  recurringExpenseId: string; // The ID of the corresponding recurring expense
+}
+
 export interface Expense {
   id: string;
   title: string;

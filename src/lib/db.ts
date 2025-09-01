@@ -1,12 +1,12 @@
 'use client';
 
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense, Employee } from '@/lib/types';
 import { calculateTotalCostInToman } from '@/lib/utils';
-import { addMonths, addYears, isBefore, startOfDay, isEqual } from 'date-fns';
+import { addMonths, addYears, isBefore, startOfDay, isEqual, endOfMonth } from 'date-fns';
 
 
 const DB_NAME = 'EasyStockDB';
-const DB_VERSION = 5; // Incremented version
+const DB_VERSION = 6; // Incremented version
 const PRODUCT_STORE = 'products';
 const SALE_STORE = 'sales';
 const SETTINGS_STORE = 'settings';
@@ -14,6 +14,7 @@ const COST_TITLES_STORE = 'costTitles';
 const CUSTOMER_STORE = 'customers';
 const EXPENSE_STORE = 'expenses';
 const RECURRING_EXPENSE_STORE = 'recurringExpenses';
+const EMPLOYEE_STORE = 'employees';
 
 
 let db: IDBDatabase;
@@ -59,6 +60,9 @@ export const openDB = (): Promise<IDBDatabase> => {
        if (!db.objectStoreNames.contains(RECURRING_EXPENSE_STORE)) {
         db.createObjectStore(RECURRING_EXPENSE_STORE, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(EMPLOYEE_STORE)) {
+        db.createObjectStore(EMPLOYEE_STORE, { keyPath: 'id' });
+      }
     };
   });
 };
@@ -67,6 +71,72 @@ const getStore = (storeName: string, mode: IDBTransactionMode) => {
   const tx = db.transaction(storeName, mode);
   return tx.objectStore(storeName);
 };
+
+// Employee Operations
+export const addEmployee = async (employeeData: Omit<Employee, 'id' | 'recurringExpenseId'>): Promise<void> => {
+    const db = await openDB();
+    const tx = db.transaction([EMPLOYEE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
+    const employeeStore = tx.objectStore(EMPLOYEE_STORE);
+    const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
+    
+    const employeeId = Date.now().toString();
+    const recurringExpenseId = `salary-${employeeId}`;
+
+    const salaryExpense: RecurringExpense = {
+        id: recurringExpenseId,
+        title: `حقوق ${employeeData.name}`,
+        amount: employeeData.salary,
+        frequency: 'monthly',
+        startDate: endOfMonth(new Date()).toISOString(),
+    };
+
+    const newEmployee: Employee = {
+        id: employeeId,
+        ...employeeData,
+        recurringExpenseId,
+    };
+
+    employeeStore.add(newEmployee);
+    recurringExpenseStore.add(salaryExpense);
+
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+};
+
+export const getAllEmployees = (): Promise<Employee[]> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(EMPLOYEE_STORE, 'readonly');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const deleteEmployee = async (id: string): Promise<void> => {
+    const db = await openDB();
+    const tx = db.transaction([EMPLOYEE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
+    const employeeStore = tx.objectStore(EMPLOYEE_STORE);
+    const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
+    
+    const employeeRequest = employeeStore.get(id);
+
+    employeeRequest.onsuccess = () => {
+        const employee: Employee = employeeRequest.result;
+        if (employee && employee.recurringExpenseId) {
+            recurringExpenseStore.delete(employee.recurringExpenseId);
+        }
+        employeeStore.delete(id);
+    };
+
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = (event) => reject((event.target as IDBRequest).error);
+    });
+};
+
 
 // Recurring Expense Operations
 export const addRecurringExpense = (expense: RecurringExpense): Promise<void> => {
@@ -120,56 +190,60 @@ export const applyRecurringExpenses = async (): Promise<number> => {
     const tx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
     const expenseStore = tx.objectStore(EXPENSE_STORE);
     const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
-    
-    const processingPromises = recurringExpenses.map(re => {
-        return new Promise<void>(resolve => {
-            let lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
-            let nextDueDate = startOfDay(new Date(re.startDate));
 
-            if (lastApplied) {
-                 if (re.frequency === 'monthly') {
-                    nextDueDate = addMonths(lastApplied, 1);
-                } else if (re.frequency === 'yearly') {
-                    nextDueDate = addYears(lastApplied, 1);
+    for (const re of recurringExpenses) {
+        let lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
+        let nextDueDate = startOfDay(new Date(re.startDate));
+        
+        // If it was applied before, calculate the next due date based on the last one.
+        if (lastApplied) {
+            if (re.frequency === 'monthly') {
+                nextDueDate = addMonths(lastApplied, 1);
+            } else if (re.frequency === 'yearly') {
+                nextDueDate = addYears(lastApplied, 1);
+            }
+        }
+        
+        while (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
+             // Use a unique ID to prevent duplicates if the function runs multiple times.
+            const expenseId = `${re.id}-${nextDueDate.toISOString().split('T')[0]}`;
+            
+            // This is a bit tricky in a loop, so we'll wrap it in a promise
+            const wasAdded = await new Promise<boolean>((resolve, reject) => {
+                const checkRequest = expenseStore.get(expenseId);
+                checkRequest.onsuccess = () => {
+                    if (!checkRequest.result) {
+                        const newExpense: Expense = {
+                            id: expenseId,
+                            title: re.title,
+                            amount: re.amount,
+                            date: nextDueDate.toISOString(),
+                        };
+                        expenseStore.add(newExpense);
+                        
+                        const updatedRecurringExpense = { ...re, lastAppliedDate: nextDueDate.toISOString() };
+                        recurringExpenseStore.put(updatedRecurringExpense);
+                        
+                        expensesAddedCount++;
+                    }
+                    resolve(true);
                 }
+                checkRequest.onerror = () => reject(checkRequest.error);
+            });
+
+            if (!wasAdded) {
+                // If there's an error, stop processing this expense
+                break;
             }
 
-            const checkAndAdd = () => {
-                if (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
-                    const expenseId = `${re.id}-${nextDueDate.toISOString()}`;
-                    
-                    const checkRequest = expenseStore.get(expenseId);
-                    checkRequest.onsuccess = () => {
-                        if (!checkRequest.result) {
-                            const newExpense: Expense = {
-                                id: expenseId,
-                                title: `${re.title} (دوره‌ای)`,
-                                amount: re.amount,
-                                date: nextDueDate.toISOString(),
-                            };
-                            expenseStore.add(newExpense);
-                            expensesAddedCount++;
-                            
-                            const updatedRecurringExpense = { ...re, lastAppliedDate: nextDueDate.toISOString() };
-                            recurringExpenseStore.put(updatedRecurringExpense);
-                        }
-                        // setup for next iteration
-                        if (re.frequency === 'monthly') {
-                            nextDueDate = addMonths(nextDueDate, 1);
-                        } else if (re.frequency === 'yearly') {
-                            nextDueDate = addYears(nextDueDate, 1);
-                        }
-                        checkAndAdd(); // recursively check for next possible due date
-                    };
-                } else {
-                    resolve(); // All due dates are in the future
-                }
-            };
-            checkAndAdd();
-        });
-    });
-
-    await Promise.all(processingPromises);
+            // Calculate the next due date for the next loop iteration
+            if (re.frequency === 'monthly') {
+                nextDueDate = addMonths(nextDueDate, 1);
+            } else if (re.frequency === 'yearly') {
+                nextDueDate = addYears(nextDueDate, 1);
+            }
+        }
+    }
 
     return new Promise<number>((resolve, reject) => {
         tx.oncomplete = () => {

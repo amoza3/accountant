@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Trash2, PlusCircle } from 'lucide-react';
+import { Trash2, PlusCircle, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -30,8 +30,11 @@ import {
   getCostTitles,
   addCostTitle,
   deleteCostTitle,
+  addEmployee,
+  getAllEmployees,
+  deleteEmployee
 } from '@/lib/db';
-import type { ExchangeRate, CostTitle } from '@/lib/types';
+import type { ExchangeRate, CostTitle, Employee } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const exchangeRatesSchema = z.object({
@@ -45,6 +48,12 @@ const exchangeRatesSchema = z.object({
 
 const costTitleSchema = z.object({
   title: z.string().min(1, 'عنوان الزامی است'),
+});
+
+const employeeSchema = z.object({
+  name: z.string().min(1, 'نام کارمند الزامی است'),
+  position: z.string().min(1, 'سمت الزامی است'),
+  salary: z.coerce.number().min(0, 'حقوق نمی‌تواند منفی باشد'),
 });
 
 function ExchangeRatesForm() {
@@ -194,15 +203,145 @@ function CostTitlesForm() {
   );
 }
 
+function EmployeeForm() {
+  const { toast } = useToast();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const form = useForm<z.infer<typeof employeeSchema>>({
+    resolver: zodResolver(employeeSchema),
+    defaultValues: { name: '', position: '', salary: 0 },
+  });
+
+  const fetchEmployees = async () => {
+    const allEmployees = await getAllEmployees();
+    setEmployees(allEmployees);
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const onSubmit = async (data: z.infer<typeof employeeSchema>) => {
+    try {
+      await addEmployee(data);
+      toast({ title: 'موفق', description: 'کارمند جدید اضافه شد و حقوق ماهانه به هزینه‌های دوره‌ای افزوده شد.' });
+      form.reset();
+      fetchEmployees();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'خطا',
+        description: 'افزودن کارمند ناموفق بود.',
+      });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteEmployee(id);
+      toast({ title: 'موفق', description: 'کارمند و هزینه حقوق مربوطه حذف شد.' });
+      fetchEmployees();
+    } catch (error) {
+       toast({
+        variant: 'destructive',
+        title: 'خطا',
+        description: 'حذف کارمند ناموفق بود.',
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 border rounded-md">
+           <h3 className="text-lg font-medium">افزودن کارمند جدید</h3>
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>نام کامل</FormLabel>
+                        <FormControl>
+                        <Input placeholder="نام کارمند" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="position"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>سمت</FormLabel>
+                        <FormControl>
+                        <Input placeholder="مثال: فروشنده" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="salary"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>حقوق ماهانه (تومان)</FormLabel>
+                        <FormControl>
+                        <Input type="number" placeholder="10,000,000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+           </div>
+          <Button type="submit" disabled={form.formState.isSubmitting}>
+            <PlusCircle className="mr-2" /> افزودن کارمند
+          </Button>
+        </form>
+      </Form>
+      <div className="space-y-2">
+        <h3 className="font-medium">لیست کارمندان</h3>
+        {employees.length > 0 ? (
+          <ul className="rounded-md border">
+            {employees.map((item) => (
+              <li key={item.id} className="flex items-center justify-between p-3 border-b last:border-b-0">
+                <div className="flex items-center gap-3">
+                   <div className="p-2 rounded-full bg-muted">
+                        <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <p className="font-semibold">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">{item.position}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <span className="font-mono text-sm">{item.salary.toLocaleString('fa-IR')} تومان</span>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center p-4">هنوز کارمندی تعریف نشده است.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 export default function SettingsPage() {
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">تنظیمات</h1>
       <Tabs defaultValue="exchange-rates">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="exchange-rates">نرخ ارز</TabsTrigger>
           <TabsTrigger value="cost-titles">عناوین هزینه</TabsTrigger>
+          <TabsTrigger value="employees">کارمندان</TabsTrigger>
         </TabsList>
         <TabsContent value="exchange-rates">
           <Card>
@@ -227,6 +366,19 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <CostTitlesForm />
+            </CardContent>
+          </Card>
+        </TabsContent>
+         <TabsContent value="employees">
+          <Card>
+            <CardHeader>
+              <CardTitle>مدیریت کارمندان</CardTitle>
+              <CardDescription>
+                کارمندان و حقوق ماهانه آن‌ها را تعریف کنید. حقوق به طور خودکار به هزینه‌های دوره‌ای اضافه خواهد شد.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmployeeForm />
             </CardContent>
           </Card>
         </TabsContent>
