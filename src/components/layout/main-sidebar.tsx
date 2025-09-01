@@ -79,8 +79,8 @@ export function MainSidebar({ appName }: { appName: string }) {
   };
   
   return (
-    <Sidebar>
-      <SidebarHeader>
+    <Sidebar className="border-l border-r-0" dir="rtl">
+      <SidebarHeader className="border-b border-b-0 border-t">
         <Logo>{appName}</Logo>
       </SidebarHeader>
       <SidebarContent>
@@ -91,9 +91,10 @@ export function MainSidebar({ appName }: { appName: string }) {
                 <SidebarMenuButton
                   isActive={isLinkActive(item.href)}
                   tooltip={item.label}
+                  className="text-right"
                 >
+                  <span className="ml-2">{item.label}</span>
                   <item.icon />
-                  <span>{item.label}</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, Trash2, Receipt, Repeat } from 'lucide-react';
+import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw } from 'lucide-react';
 import {
   getAllExpenses,
   addExpense,
@@ -12,6 +12,7 @@ import {
   getAllRecurringExpenses,
   addRecurringExpense,
   deleteRecurringExpense,
+  applyRecurringExpenses,
 } from '@/lib/db';
 import type { Expense, RecurringExpense, RecurringExpenseFrequency } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -282,10 +283,22 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [isProcessingRecurring, setIsProcessingRecurring] = useState(false);
   const { toast } = useToast();
 
   const fetchExpenses = async () => {
     try {
+      setIsProcessingRecurring(true);
+      // First apply any pending recurring expenses
+      const addedCount = await applyRecurringExpenses();
+      if (addedCount > 0) {
+        toast({
+          title: 'هزینه‌های دوره‌ای اعمال شد',
+          description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
+        });
+      }
+      
+      // Then fetch all expenses including the newly added ones
       const allExpenses = await getAllExpenses();
       setExpenses(allExpenses);
     } catch (error) {
@@ -294,6 +307,8 @@ export default function ExpensesPage() {
         title: 'خطا',
         description: 'بارگذاری لیست مخارج ناموفق بود.',
       });
+    } finally {
+      setIsProcessingRecurring(false);
     }
   };
 
@@ -335,7 +350,19 @@ export default function ExpensesPage() {
         </Tabs>
       </div>
       <div className="md:col-span-2">
-        <h1 className="text-2xl font-bold mb-6">لیست مخارج ثبت‌شده</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">لیست مخارج ثبت‌شده</h1>
+          <Button 
+            onClick={fetchExpenses} 
+            variant="outline" 
+            size="sm"
+            className="flex items-center gap-2"
+            disabled={isProcessingRecurring}
+          >
+            <RefreshCw className={`h-4 w-4 ${isProcessingRecurring ? 'animate-spin' : ''}`} />
+            {isProcessingRecurring ? 'در حال پردازش...' : 'بروزرسانی'}
+          </Button>
+        </div>
         <Card>
           <CardContent className="p-0">
              <ScrollArea className="h-[70vh]">
