@@ -105,7 +105,7 @@ export default function ReportsPage() {
     const dataMap = new Map<string, { فروش: number, 'سود ناخالص': number, مخارج: number }>();
     
     let dateFormat = "yyyy/MM/dd";
-    if (timeRange === 'this_year' || timeRange === 'last_year' || (timeRange === 'all' && (filteredSales.length > 30 || filteredExpenses.length > 30))) {
+    if (timeRange === 'this_year' || timeRange === 'last_year' || (timeRange === 'all' && (sales.length > 30 || expenses.length > 30))) {
         dateFormat = "yyyy/MM";
     }
 
@@ -139,7 +139,7 @@ export default function ReportsPage() {
         }))
         .sort((a,b) => new Date(a.name).getTime() - new Date(b.name).getTime());
 
-  }, [filteredSales, filteredExpenses, timeRange]);
+  }, [filteredSales, filteredExpenses, timeRange, sales, expenses]);
 
   const { totalSales, totalGrossProfit, totalExpenses, totalNetProfit } = useMemo(() => {
     const grossProfit = filteredSales.reduce((total, sale) => {
@@ -150,13 +150,13 @@ export default function ReportsPage() {
         }, 0);
         return total + saleProfit;
     }, 0);
-    const expenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const expensesSum = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
 
     return {
         totalSales: filteredSales.reduce((sum, sale) => sum + sale.total, 0),
         totalGrossProfit: grossProfit,
-        totalExpenses: expenses,
-        totalNetProfit: grossProfit - expenses,
+        totalExpenses: expensesSum,
+        totalNetProfit: grossProfit - expensesSum,
     };
   }, [filteredSales, filteredExpenses]);
   
@@ -218,7 +218,7 @@ export default function ReportsPage() {
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-96 w-full lg:col-span-4" />
             </div>
-        ) : chartData.length > 0 ? (
+        ) : sales.length > 0 || expenses.length > 0 ? (
         <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
@@ -287,5 +287,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    

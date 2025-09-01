@@ -439,17 +439,25 @@ export default function InventoryPage() {
 
   useEffect(() => {
     const checkRecurringExpenses = async () => {
-        const addedCount = await applyRecurringExpenses();
-        if (addedCount > 0) {
-            toast({
-                title: 'هزینه‌های دوره‌ای ثبت شد',
-                description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
+        try {
+            const addedCount = await applyRecurringExpenses();
+            if (addedCount > 0) {
+                toast({
+                    title: 'هزینه‌های دوره‌ای ثبت شد',
+                    description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
+                });
+            }
+        } catch(error) {
+             console.error("Failed to apply recurring expenses:", error);
+             toast({
+                variant: 'destructive',
+                title: 'خطا در ثبت خودکار هزینه‌ها',
+                description: 'سیستم نتوانست هزینه‌های دوره‌ای را بررسی و ثبت کند.',
             });
         }
     };
     
-    checkRecurringExpenses();
-    fetchProducts();
+    checkRecurringExpenses().then(() => fetchProducts());
   }, []);
 
   const handleDelete = async (id: string) => {
