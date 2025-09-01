@@ -22,6 +22,9 @@ import { useToast } from '@/hooks/use-toast';
 import { CURRENCY_SYMBOLS } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Paperclip } from 'lucide-react';
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
     CASH: 'نقد',
@@ -48,6 +51,8 @@ export default function SalesHistoryPage() {
     }
     fetchSales();
   }, [toast]);
+
+  const totalPaid = (sale: Sale) => sale.payments.reduce((acc, p) => acc + p.amount, 0);
 
   return (
     <div className="flex flex-col h-full">
@@ -76,7 +81,7 @@ export default function SalesHistoryPage() {
                                 </span>
                             </div>
                             <div className="flex items-center gap-4">
-                                <Badge variant="outline">{paymentMethodLabels[sale.paymentMethod]}</Badge>
+                               {totalPaid(sale) < sale.total && <Badge variant="destructive">پرداخت نشده</Badge>}
                                 <span className="font-semibold text-lg">
                                     {sale.total.toLocaleString('fa-IR')}{' '}
                                     {CURRENCY_SYMBOLS.TOMAN}
@@ -85,30 +90,70 @@ export default function SalesHistoryPage() {
                         </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                        <Table>
-                            <TableHeader>
-                            <TableRow>
-                                <TableHead>نام محصول</TableHead>
-                                <TableHead>تعداد</TableHead>
-                                <TableHead>قیمت واحد</TableHead>
-                                <TableHead>جمع</TableHead>
-                            </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                            {sale.items.map((item) => (
-                                <TableRow key={item.productId}>
-                                <TableCell>{item.productName}</TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>
-                                    {item.price.toLocaleString('fa-IR')}
-                                </TableCell>
-                                <TableCell>
-                                    {(item.quantity * item.price).toLocaleString('fa-IR')}
-                                </TableCell>
-                                </TableRow>
-                            ))}
-                            </TableBody>
-                        </Table>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 className="font-semibold mb-2">اقلام فروش</h4>
+                                 <Table>
+                                    <TableHeader>
+                                    <TableRow>
+                                        <TableHead>نام محصول</TableHead>
+                                        <TableHead>تعداد</TableHead>
+                                        <TableHead>قیمت واحد</TableHead>
+                                        <TableHead>جمع</TableHead>
+                                    </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                    {sale.items.map((item) => (
+                                        <TableRow key={item.productId}>
+                                        <TableCell>{item.productName}</TableCell>
+                                        <TableCell>{item.quantity}</TableCell>
+                                        <TableCell>
+                                            {item.price.toLocaleString('fa-IR')}
+                                        </TableCell>
+                                        <TableCell>
+                                            {(item.quantity * item.price).toLocaleString('fa-IR')}
+                                        </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold mb-2">پرداخت‌ها</h4>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>روش</TableHead>
+                                            <TableHead>مبلغ</TableHead>
+                                            <TableHead>رسید</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sale.payments.map((payment) => (
+                                            <TableRow key={payment.id}>
+                                                <TableCell>{paymentMethodLabels[payment.method]}</TableCell>
+                                                <TableCell>{payment.amount.toLocaleString('fa-IR')}</TableCell>
+                                                <TableCell>
+                                                    {payment.receiptNumber || '-'}
+                                                    {payment.receiptImage && (
+                                                        <Dialog>
+                                                            <DialogTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="mr-2"><Paperclip className="h-4 w-4" /></Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent>
+                                                                <DialogHeader><DialogTitle>تصویر رسید</DialogTitle></DialogHeader>
+                                                                <img src={payment.receiptImage} alt={`رسید ${payment.receiptNumber || ''}`} className="max-w-full h-auto rounded-md" />
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </div>
+
                         </AccordionContent>
                     </AccordionItem>
                     ))}

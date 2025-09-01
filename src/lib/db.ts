@@ -1,12 +1,12 @@
 'use client';
 
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense, Employee } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense, Employee, Payment, PaymentMethod } from '@/lib/types';
 import { calculateTotalCostInToman } from '@/lib/utils';
 import { addMonths, addYears, isBefore, startOfDay, isEqual, endOfMonth } from 'date-fns';
 
 
 const DB_NAME = 'EasyStockDB';
-const DB_VERSION = 6; // Incremented version
+const DB_VERSION = 7; // Incremented version
 const PRODUCT_STORE = 'products';
 const SALE_STORE = 'sales';
 const SETTINGS_STORE = 'settings';
@@ -182,77 +182,75 @@ export const updateRecurringExpense = (expense: RecurringExpense): Promise<void>
 
 // Function to check and apply recurring expenses
 export const applyRecurringExpenses = async (): Promise<number> => {
-    const db = await openDB();
-    const recurringExpenses = await getAllRecurringExpenses();
-    const today = startOfDay(new Date());
-    let expensesAddedCount = 0;
+  const db = await openDB();
+  const recurringExpenses = await getAllRecurringExpenses();
+  const today = startOfDay(new Date());
+  let expensesAddedCount = 0;
 
-    const tx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
-    const expenseStore = tx.objectStore(EXPENSE_STORE);
-    const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
+  const tx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
+  const expenseStore = tx.objectStore(EXPENSE_STORE);
+  const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
+  
+  const processingPromises: Promise<void>[] = [];
 
-    for (const re of recurringExpenses) {
-        let lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
-        let nextDueDate = startOfDay(new Date(re.startDate));
-        
-        // If it was applied before, calculate the next due date based on the last one.
-        if (lastApplied) {
-            if (re.frequency === 'monthly') {
-                nextDueDate = addMonths(lastApplied, 1);
-            } else if (re.frequency === 'yearly') {
-                nextDueDate = addYears(lastApplied, 1);
-            }
-        }
-        
-        while (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
-             // Use a unique ID to prevent duplicates if the function runs multiple times.
-            const expenseId = `${re.id}-${nextDueDate.toISOString().split('T')[0]}`;
-            
-            // This is a bit tricky in a loop, so we'll wrap it in a promise
-            const wasAdded = await new Promise<boolean>((resolve, reject) => {
-                const checkRequest = expenseStore.get(expenseId);
-                checkRequest.onsuccess = () => {
-                    if (!checkRequest.result) {
-                        const newExpense: Expense = {
-                            id: expenseId,
-                            title: re.title,
-                            amount: re.amount,
-                            date: nextDueDate.toISOString(),
-                        };
-                        expenseStore.add(newExpense);
-                        
-                        const updatedRecurringExpense = { ...re, lastAppliedDate: nextDueDate.toISOString() };
-                        recurringExpenseStore.put(updatedRecurringExpense);
-                        
-                        expensesAddedCount++;
-                    }
-                    resolve(true);
+  for (const re of recurringExpenses) {
+    let nextDueDate = startOfDay(new Date(re.startDate));
+    const lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
+
+    if (lastApplied) {
+      if (re.frequency === 'monthly') {
+        nextDueDate = addMonths(lastApplied, 1);
+      } else if (re.frequency === 'yearly') {
+        nextDueDate = addYears(lastApplied, 1);
+      }
+    }
+    
+    while (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
+        const currentDueDate = new Date(nextDueDate.getTime());
+        const processingPromise = new Promise<void>((resolve, reject) => {
+            const expenseId = `${re.id}-${currentDueDate.toISOString().split('T')[0]}`;
+            const checkRequest = expenseStore.get(expenseId);
+
+            checkRequest.onsuccess = () => {
+                if (!checkRequest.result) {
+                    const newExpense: Expense = {
+                        id: expenseId,
+                        title: re.title,
+                        amount: re.amount,
+                        date: currentDueDate.toISOString(),
+                    };
+                    expenseStore.add(newExpense);
+
+                    const updatedRecurringExpense = { ...re, lastAppliedDate: currentDueDate.toISOString() };
+                    recurringExpenseStore.put(updatedRecurringExpense);
+                    
+                    expensesAddedCount++;
                 }
-                checkRequest.onerror = () => reject(checkRequest.error);
-            });
+                resolve();
+            };
+            checkRequest.onerror = () => reject(checkRequest.error);
+        });
 
-            if (!wasAdded) {
-                // If there's an error, stop processing this expense
-                break;
-            }
+        processingPromises.push(processingPromise);
 
-            // Calculate the next due date for the next loop iteration
-            if (re.frequency === 'monthly') {
-                nextDueDate = addMonths(nextDueDate, 1);
-            } else if (re.frequency === 'yearly') {
-                nextDueDate = addYears(nextDueDate, 1);
-            }
+        if (re.frequency === 'monthly') {
+            nextDueDate = addMonths(nextDueDate, 1);
+        } else if (re.frequency === 'yearly') {
+            nextDueDate = addYears(nextDueDate, 1);
         }
     }
+  }
 
-    return new Promise<number>((resolve, reject) => {
-        tx.oncomplete = () => {
-            resolve(expensesAddedCount);
-        };
-        tx.onerror = () => {
-            reject(tx.error);
-        };
-    });
+  await Promise.all(processingPromises);
+  
+  return new Promise<number>((resolve, reject) => {
+      tx.oncomplete = () => {
+          resolve(expensesAddedCount);
+      };
+      tx.onerror = () => {
+          reject(tx.error);
+      };
+  });
 };
 
 
@@ -410,7 +408,7 @@ export const deleteProduct = (id: string): Promise<void> => {
 };
 
 // Sale Operations
-export const addSale = async (sale: Omit<Sale, 'items'> & { items: Omit<SaleItem, 'totalCost'>[] }, newCustomerName?: string): Promise<void> => {
+export const addSale = async (saleData: Pick<Sale, 'total' | 'customerId' | 'customerName' | 'payments' | 'date'> & { items: Omit<SaleItem, 'totalCost'>[] }, newCustomerName?: string): Promise<void> => {
     const db = await openDB();
     const tx = db.transaction([SALE_STORE, PRODUCT_STORE, CUSTOMER_STORE, SETTINGS_STORE], 'readwrite');
     const saleStore = tx.objectStore(SALE_STORE);
@@ -418,10 +416,10 @@ export const addSale = async (sale: Omit<Sale, 'items'> & { items: Omit<SaleItem
     const customerStore = tx.objectStore(CUSTOMER_STORE);
     const settingsStore = tx.objectStore(SETTINGS_STORE);
 
-    let saleToSave: Sale = { ...sale, items: [] };
+    let saleToSave: Sale = { ...saleData, id: Date.now(), items: [] };
 
     // Handle new customer creation
-    if (newCustomerName && !sale.customerId) {
+    if (newCustomerName && !saleData.customerId) {
         const newCustomer: Customer = {
             id: Date.now().toString(),
             name: newCustomerName,
@@ -453,7 +451,7 @@ export const addSale = async (sale: Omit<Sale, 'items'> & { items: Omit<SaleItem
     });
 
     // Enrich sale items with totalCost and update product quantities
-    const productUpdatePromises = sale.items.map(item => {
+    const productUpdatePromises = saleData.items.map(item => {
         return new Promise<void>((resolveUpdate, rejectUpdate) => {
             const getRequest = productStore.get(item.productId);
             getRequest.onsuccess = () => {
@@ -486,7 +484,7 @@ export const addSale = async (sale: Omit<Sale, 'items'> & { items: Omit<SaleItem
     await Promise.all(productUpdatePromises);
     
     // Save the sale
-    const addSaleRequest = saleStore.add(saleToSave);
+    saleStore.add(saleToSave);
     return new Promise((resolve, reject) => {
          tx.oncomplete = () => resolve();
          tx.onerror = () => reject(tx.error);
@@ -506,7 +504,6 @@ export const addSale = async (sale: Omit<Sale, 'items'> & { items: Omit<SaleItem
 
 // Settings Operations
 const EXCHANGE_RATES_KEY = 'exchangeRates';
-const COST_TITLES_KEY = 'costTitles';
 
 export const getExchangeRates = (): Promise<ExchangeRate[]> => {
     return new Promise(async (resolve, reject) => {

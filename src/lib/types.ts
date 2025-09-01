@@ -34,14 +34,23 @@ export interface SaleItem {
   totalCost: number; // Total cost at the time of sale
 }
 
+export interface Payment {
+  id: string; // Unique ID for the payment
+  amount: number;
+  method: PaymentMethod;
+  date: string; // ISO date string
+  receiptNumber?: string;
+  receiptImage?: string; // Base64 encoded image
+}
+
 export interface Sale {
   id: number; // Timestamp of the sale
   items: SaleItem[];
   total: number;
+  payments: Payment[];
   date: string;
   customerId?: string;
   customerName?: string;
-  paymentMethod: PaymentMethod;
 }
 
 export interface ExchangeRate {
@@ -67,6 +76,8 @@ export interface Expense {
   title: string;
   amount: number;
   date: string;
+  receiptNumber?: string;
+  receiptImage?: string; // Base64 encoded image
 }
 
 export interface RecurringExpense {

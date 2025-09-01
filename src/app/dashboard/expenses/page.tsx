@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw } from 'lucide-react';
+import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw, Paperclip } from 'lucide-react';
 import {
   getAllExpenses,
   addExpense,
@@ -49,10 +49,13 @@ import { CURRENCY_SYMBOLS } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const expenseSchema = z.object({
   title: z.string().min(1, 'عنوان هزینه الزامی است'),
   amount: z.coerce.number().min(1, 'مبلغ باید بزرگتر از صفر باشد'),
+  receiptNumber: z.string().optional(),
+  receiptImage: z.string().optional(),
 });
 
 const recurringExpenseSchema = z.object({
@@ -66,9 +69,20 @@ function OneTimeExpenseForm({ onExpenseAdded }: { onExpenseAdded: () => void }) 
   const { toast } = useToast();
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: { title: '', amount: 0 },
+    defaultValues: { title: '', amount: 0, receiptNumber: '', receiptImage: '' },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        form.setValue('receiptImage', reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
   const onSubmit = async (data: z.infer<typeof expenseSchema>) => {
     try {
       const newExpense: Expense = {
@@ -120,6 +134,40 @@ function OneTimeExpenseForm({ onExpenseAdded }: { onExpenseAdded: () => void }) 
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="receiptNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>شماره رسید/سند (اختیاری)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="123456" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="receiptImage"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>تصویر رسید (اختیاری)</FormLabel>
+                  <FormControl>
+                    <Input type="file" accept="image/*" onChange={handleFileChange} className="pt-2"/>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {form.watch('receiptImage') && (
+                <div className="relative w-32 h-32">
+                    <img src={form.watch('receiptImage')} alt="پیش‌نمایش رسید" className="rounded-md object-cover w-full h-full" />
+                    <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => form.setValue('receiptImage', '')}>
+                        <Trash2 className="h-4 w-4"/>
+                    </Button>
+                </div>
+            )}
             <Button type="submit" className="w-full">
               <PlusCircle className="mr-2 h-4 w-4" />
               ثبت هزینه
@@ -288,29 +336,43 @@ export default function ExpensesPage() {
 
   const fetchExpenses = async () => {
     try {
-      setIsProcessingRecurring(true);
-      // First apply any pending recurring expenses
-      const addedCount = await applyRecurringExpenses();
-      if (addedCount > 0) {
-        toast({
-          title: 'هزینه‌های دوره‌ای اعمال شد',
-          description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
-        });
-      }
-      
-      // Then fetch all expenses including the newly added ones
-      const allExpenses = await getAllExpenses();
-      setExpenses(allExpenses);
+        const allExpenses = await getAllExpenses();
+        setExpenses(allExpenses);
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'خطا',
-        description: 'بارگذاری لیست مخارج ناموفق بود.',
-      });
-    } finally {
-      setIsProcessingRecurring(false);
+         toast({
+            variant: 'destructive',
+            title: 'خطا',
+            description: 'بارگذاری لیست مخارج ناموفق بود.',
+        });
     }
   };
+  
+  const handleApplyRecurring = async () => {
+      setIsProcessingRecurring(true);
+      try {
+        const addedCount = await applyRecurringExpenses();
+        if (addedCount > 0) {
+            toast({
+                title: 'هزینه‌های دوره‌ای اعمال شد',
+                description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
+            });
+        } else {
+             toast({
+                title: 'به‌روز',
+                description: 'هیچ هزینه دوره‌ای جدیدی برای ثبت وجود نداشت.',
+            });
+        }
+        fetchExpenses();
+      } catch (error) {
+         toast({
+            variant: 'destructive',
+            title: 'خطا در پردازش',
+            description: 'اعمال هزینه‌های دوره‌ای ناموفق بود.',
+        });
+      } finally {
+          setIsProcessingRecurring(false);
+      }
+  }
 
   useEffect(() => {
     fetchExpenses();
@@ -353,14 +415,14 @@ export default function ExpensesPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">لیست مخارج ثبت‌شده</h1>
           <Button 
-            onClick={fetchExpenses} 
+            onClick={handleApplyRecurring} 
             variant="outline" 
             size="sm"
             className="flex items-center gap-2"
             disabled={isProcessingRecurring}
           >
             <RefreshCw className={`h-4 w-4 ${isProcessingRecurring ? 'animate-spin' : ''}`} />
-            {isProcessingRecurring ? 'در حال پردازش...' : 'بروزرسانی'}
+            {isProcessingRecurring ? 'در حال پردازش...' : 'بررسی و ثبت هزینه‌های دوره‌ای'}
           </Button>
         </div>
         <Card>
@@ -378,10 +440,24 @@ export default function ExpensesPage() {
                                 <p className="font-semibold">{expense.title}</p>
                                 <p className="text-sm text-muted-foreground">
                                     {new Date(expense.date).toLocaleDateString('fa-IR')}
+                                    {expense.receiptNumber && ` - رسید: ${expense.receiptNumber}`}
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            {expense.receiptImage && (
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="icon"><Paperclip className="h-4 w-4" /></Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>تصویر رسید برای: {expense.title}</DialogTitle>
+                                        </DialogHeader>
+                                        <img src={expense.receiptImage} alt={`رسید برای ${expense.title}`} className="max-w-full h-auto rounded-md" />
+                                    </DialogContent>
+                                </Dialog>
+                            )}
                            <span className="font-bold text-red-600">
                              {expense.amount.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
                            </span>
