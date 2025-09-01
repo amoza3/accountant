@@ -112,72 +112,73 @@ export const updateRecurringExpense = (expense: RecurringExpense): Promise<void>
 
 // Function to check and apply recurring expenses
 export const applyRecurringExpenses = async (): Promise<number> => {
-    await openDB();
+    const db = await openDB();
     const recurringExpenses = await getAllRecurringExpenses();
     const today = startOfDay(new Date());
     let expensesAddedCount = 0;
-    const expensePromises: Promise<void>[] = [];
 
-    for (const re of recurringExpenses) {
-        let lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
-        let nextDueDate = startOfDay(new Date(re.startDate));
-        
-        if(lastApplied) {
-            // Calculate next due date based on last applied date
-             if (re.frequency === 'monthly') {
-                nextDueDate = addMonths(lastApplied, 1);
-            } else if (re.frequency === 'yearly') {
-                nextDueDate = addYears(lastApplied, 1);
-            }
-        }
-        
-        while (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
-             const expenseId = `${re.id}-${nextDueDate.toISOString()}`;
-             
-             const expensePromise = new Promise<void>(async (resolve, reject) => {
-                const tx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
-                const expenseStore = tx.objectStore(EXPENSE_STORE);
-                const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
-
-                const checkRequest = expenseStore.get(expenseId);
-                
-                checkRequest.onsuccess = () => {
-                    if (!checkRequest.result) {
-                        // Expense does not exist, add it
-                        const newExpense: Expense = {
-                            id: expenseId,
-                            title: `${re.title} (دوره‌ای)`,
-                            amount: re.amount,
-                            date: nextDueDate.toISOString(),
-                        };
-                        const addRequest = expenseStore.add(newExpense);
-                        addRequest.onsuccess = () => {
-                             expensesAddedCount++;
-                             const updatedRecurringExpense = { ...re, lastAppliedDate: nextDueDate.toISOString() };
-                             recurringExpenseStore.put(updatedRecurringExpense);
-                        };
-                         addRequest.onerror = () => reject(addRequest.error);
-                    }
-                };
-                checkRequest.onerror = () => reject(checkRequest.error);
-
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-             });
-             expensePromises.push(expensePromise);
-            
-            // Set up for the next iteration of the while loop
-            lastApplied = nextDueDate;
-             if (re.frequency === 'monthly') {
-                nextDueDate = addMonths(lastApplied, 1);
-            } else if (re.frequency === 'yearly') {
-                nextDueDate = addYears(lastApplied, 1);
-            }
-        }
-    }
+    const tx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
+    const expenseStore = tx.objectStore(EXPENSE_STORE);
+    const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
     
-    await Promise.all(expensePromises);
-    return expensesAddedCount;
+    const processingPromises = recurringExpenses.map(re => {
+        return new Promise<void>(resolve => {
+            let lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : null;
+            let nextDueDate = startOfDay(new Date(re.startDate));
+
+            if (lastApplied) {
+                 if (re.frequency === 'monthly') {
+                    nextDueDate = addMonths(lastApplied, 1);
+                } else if (re.frequency === 'yearly') {
+                    nextDueDate = addYears(lastApplied, 1);
+                }
+            }
+
+            const checkAndAdd = () => {
+                if (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
+                    const expenseId = `${re.id}-${nextDueDate.toISOString()}`;
+                    
+                    const checkRequest = expenseStore.get(expenseId);
+                    checkRequest.onsuccess = () => {
+                        if (!checkRequest.result) {
+                            const newExpense: Expense = {
+                                id: expenseId,
+                                title: `${re.title} (دوره‌ای)`,
+                                amount: re.amount,
+                                date: nextDueDate.toISOString(),
+                            };
+                            expenseStore.add(newExpense);
+                            expensesAddedCount++;
+                            
+                            const updatedRecurringExpense = { ...re, lastAppliedDate: nextDueDate.toISOString() };
+                            recurringExpenseStore.put(updatedRecurringExpense);
+                        }
+                        // setup for next iteration
+                        if (re.frequency === 'monthly') {
+                            nextDueDate = addMonths(nextDueDate, 1);
+                        } else if (re.frequency === 'yearly') {
+                            nextDueDate = addYears(nextDueDate, 1);
+                        }
+                        checkAndAdd(); // recursively check for next possible due date
+                    };
+                } else {
+                    resolve(); // All due dates are in the future
+                }
+            };
+            checkAndAdd();
+        });
+    });
+
+    await Promise.all(processingPromises);
+
+    return new Promise<number>((resolve, reject) => {
+        tx.oncomplete = () => {
+            resolve(expensesAddedCount);
+        };
+        tx.onerror = () => {
+            reject(tx.error);
+        };
+    });
 };
 
 
@@ -488,5 +489,3 @@ export const deleteCostTitle = (id: string): Promise<void> => {
         request.onerror = () => reject(request.error);
     });
 };
-
-    

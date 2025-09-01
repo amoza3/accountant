@@ -111,7 +111,7 @@ export default function ReportsPage() {
 
     filteredSales.forEach(sale => {
       const dateKey = format(new Date(sale.date), dateFormat);
-      const saleProfit = sale.items.reduce((acc, item) => {
+      const saleGrossProfit = sale.items.reduce((acc, item) => {
           const itemRevenue = item.price * item.quantity;
           const itemCost = item.totalCost || 0; // Fallback to 0 if totalCost is not available
           return acc + (itemRevenue - itemCost);
@@ -119,7 +119,7 @@ export default function ReportsPage() {
       
       const current = dataMap.get(dateKey) || { فروش: 0, 'سود ناخالص': 0, مخارج: 0 };
       current.فروش += sale.total;
-      current['سود ناخالص'] += saleProfit;
+      current['سود ناخالص'] += saleGrossProfit;
       dataMap.set(dateKey, current);
     });
 
