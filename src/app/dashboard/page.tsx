@@ -8,7 +8,8 @@ import {
   deleteProduct,
   updateProduct,
   getExchangeRates,
-  getCostTitles
+  getCostTitles,
+  applyRecurringExpenses,
 } from '@/lib/db';
 import type { Product, ExchangeRate, CostTitle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -437,6 +438,17 @@ export default function InventoryPage() {
   };
 
   useEffect(() => {
+    const checkRecurringExpenses = async () => {
+        const addedCount = await applyRecurringExpenses();
+        if (addedCount > 0) {
+            toast({
+                title: 'هزینه‌های دوره‌ای ثبت شد',
+                description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
+            });
+        }
+    };
+    
+    checkRecurringExpenses();
     fetchProducts();
   }, []);
 

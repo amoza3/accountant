@@ -1,5 +1,6 @@
 export type Currency = 'TOMAN' | 'AED' | 'CNY' | 'USD';
 export type PaymentMethod = 'CASH' | 'CARD' | 'ONLINE';
+export type RecurringExpenseFrequency = 'monthly' | 'yearly';
 
 export interface ProductCost {
   id: string;
@@ -58,4 +59,13 @@ export interface Expense {
   title: string;
   amount: number;
   date: string;
+}
+
+export interface RecurringExpense {
+  id: string;
+  title: string;
+  amount: number;
+  frequency: RecurringExpenseFrequency;
+  startDate: string; // ISO date string
+  lastAppliedDate?: string; // ISO date string
 }

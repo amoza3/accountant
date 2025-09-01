@@ -1,16 +1,19 @@
 'use client';
 
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense } from '@/lib/types';
 import { calculateTotalCostInToman } from '@/lib/utils';
+import { addMonths, addYears, isBefore, startOfDay } from 'date-fns';
+
 
 const DB_NAME = 'EasyStockDB';
-const DB_VERSION = 4; // Incremented version
+const DB_VERSION = 5; // Incremented version
 const PRODUCT_STORE = 'products';
 const SALE_STORE = 'sales';
 const SETTINGS_STORE = 'settings';
 const COST_TITLES_STORE = 'costTitles';
 const CUSTOMER_STORE = 'customers';
 const EXPENSE_STORE = 'expenses';
+const RECURRING_EXPENSE_STORE = 'recurringExpenses';
 
 
 let db: IDBDatabase;
@@ -53,6 +56,9 @@ export const openDB = (): Promise<IDBDatabase> => {
        if (!db.objectStoreNames.contains(EXPENSE_STORE)) {
         db.createObjectStore(EXPENSE_STORE, { keyPath: 'id' });
       }
+       if (!db.objectStoreNames.contains(RECURRING_EXPENSE_STORE)) {
+        db.createObjectStore(RECURRING_EXPENSE_STORE, { keyPath: 'id' });
+      }
     };
   });
 };
@@ -61,6 +67,119 @@ const getStore = (storeName: string, mode: IDBTransactionMode) => {
   const tx = db.transaction(storeName, mode);
   return tx.objectStore(storeName);
 };
+
+// Recurring Expense Operations
+export const addRecurringExpense = (expense: RecurringExpense): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(RECURRING_EXPENSE_STORE, 'readwrite');
+        const request = store.add(expense);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const getAllRecurringExpenses = (): Promise<RecurringExpense[]> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(RECURRING_EXPENSE_STORE, 'readonly');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const deleteRecurringExpense = (id: string): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(RECURRING_EXPENSE_STORE, 'readwrite');
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const updateRecurringExpense = (expense: RecurringExpense): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(RECURRING_EXPENSE_STORE, 'readwrite');
+        const request = store.put(expense);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
+
+// Function to check and apply recurring expenses
+export const applyRecurringExpenses = async (): Promise<number> => {
+    const db = await openDB();
+    const recurringExpenses = await getAllRecurringExpenses();
+    const today = startOfDay(new Date());
+    let expensesAddedCount = 0;
+
+    for (const re of recurringExpenses) {
+        let nextDueDate = new Date(re.startDate);
+        const lastApplied = re.lastAppliedDate ? new Date(re.lastAppliedDate) : null;
+
+        if (lastApplied) {
+             // Calculate next due date based on last applied date
+            if (re.frequency === 'monthly') {
+                nextDueDate = addMonths(lastApplied, 1);
+            } else if (re.frequency === 'yearly') {
+                nextDueDate = addYears(lastApplied, 1);
+            }
+        }
+        
+        // Check if the due date is today or in the past
+        while (isBefore(nextDueDate, today) || nextDueDate.getTime() === today.getTime()) {
+             const newExpense: Expense = {
+                id: `${re.id}-${nextDueDate.toISOString()}`,
+                title: `${re.title} (دوره‌ای)`,
+                amount: re.amount,
+                date: nextDueDate.toISOString(),
+            };
+            
+            // Use a transaction to avoid adding duplicates
+            const tx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
+            const expenseStore = tx.objectStore(EXPENSE_STORE);
+            const recurringExpenseStore = tx.objectStore(RECURRING_EXPENSE_STORE);
+
+            const checkReq = expenseStore.get(newExpense.id);
+            
+            await new Promise<void>((resolve) => {
+                checkReq.onsuccess = async () => {
+                    if (!checkReq.result) {
+                        const addReq = expenseStore.add(newExpense);
+                         await new Promise<void>((res, rej) => {
+                            addReq.onsuccess = () => {
+                                expensesAddedCount++;
+                                res();
+                            };
+                            addReq.onerror = () => rej(addReq.error);
+                        });
+                        
+                        re.lastAppliedDate = nextDueDate.toISOString();
+                        const updateReq = recurringExpenseStore.put(re);
+                        await new Promise<void>((res, rej) => {
+                            updateReq.onsuccess = () => res();
+                            updateReq.onerror = () => rej(updateReq.error);
+                        });
+                    }
+                    resolve();
+                };
+            });
+            
+            // Calculate the next due date for the while loop
+            if (re.frequency === 'monthly') {
+                nextDueDate = addMonths(nextDueDate, 1);
+            } else if (re.frequency === 'yearly') {
+                nextDueDate = addYears(nextDueDate, 1);
+            }
+        }
+    }
+    return expensesAddedCount;
+};
+
 
 // Expense Operations
 export const addExpense = (expense: Expense): Promise<void> => {
