@@ -35,7 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { addProduct, getProductById, getCostTitles, getExchangeRates } from '@/lib/db';
 import type { Product, CostTitle, ExchangeRate } from '@/lib/types';
 import { useRouter } from 'next/navigation';
-import { calculateSellingPrice, CURRENCY_SYMBOLS } from '@/lib/utils';
+import { calculateSellingPrice, CURRENCY_SYMBOLS, calculateTotalCostInToman } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
 const productSchema = z.object({
