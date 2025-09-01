@@ -1,6 +1,7 @@
 'use client';
 
-import type { Product, Sale, ExchangeRate, CostTitle, Customer } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem } from '@/lib/types';
+import { calculateTotalCostInToman } from '@/lib/utils';
 
 const DB_NAME = 'EasyStockDB';
 const DB_VERSION = 3; // Incremented version
@@ -173,20 +174,23 @@ export const deleteProduct = (id: string): Promise<void> => {
 };
 
 // Sale Operations
-export const addSale = async (sale: Sale, newCustomerName?: string): Promise<void> => {
+export const addSale = async (sale: Omit<Sale, 'items'> & { items: Omit<SaleItem, 'totalCost'>[] }, newCustomerName?: string): Promise<void> => {
     const db = await openDB();
-    const tx = db.transaction([SALE_STORE, PRODUCT_STORE, CUSTOMER_STORE], 'readwrite');
+    const tx = db.transaction([SALE_STORE, PRODUCT_STORE, CUSTOMER_STORE, SETTINGS_STORE], 'readwrite');
     const saleStore = tx.objectStore(SALE_STORE);
     const productStore = tx.objectStore(PRODUCT_STORE);
     const customerStore = tx.objectStore(CUSTOMER_STORE);
+    const settingsStore = tx.objectStore(SETTINGS_STORE);
 
-    let saleToSave = { ...sale };
+    let saleToSave: Sale = { ...sale, items: [] };
 
     // Handle new customer creation
     if (newCustomerName && !sale.customerId) {
         const newCustomer: Customer = {
             id: Date.now().toString(),
             name: newCustomerName,
+            phone: '',
+            address: ''
         };
         await new Promise<void>((resolve, reject) => {
             const req = customerStore.add(newCustomer);
@@ -199,26 +203,37 @@ export const addSale = async (sale: Sale, newCustomerName?: string): Promise<voi
         });
     }
 
-    // Save the sale
-    await new Promise<void>((resolve, reject) => {
-        const req = saleStore.add(saleToSave);
-        req.onsuccess = () => resolve();
+    const rates: ExchangeRate[] = await new Promise((resolve, reject) => {
+        const req = settingsStore.get('exchangeRates');
+        req.onsuccess = () => resolve(req.result?.value || []);
         req.onerror = () => reject(req.error);
     });
 
-    // Update product quantities
+    // Enrich sale items with totalCost and update product quantities
     const productUpdates = sale.items.map(item => {
-        return new Promise<void>((resolveUpdate, rejectUpdate) => {
+        return new Promise<void>(async (resolveUpdate, rejectUpdate) => {
             const getRequest = productStore.get(item.productId);
             getRequest.onsuccess = () => {
-                const product = getRequest.result;
+                const product = getRequest.result as Product | undefined;
                 if (product) {
+                    const totalCost = calculateTotalCostInToman(product.costs, rates);
+                    
+                    (saleToSave.items as SaleItem[]).push({
+                        ...item,
+                        totalCost: totalCost * item.quantity
+                    });
+
                     product.quantity -= item.quantity;
                     const putRequest = productStore.put(product);
                     putRequest.onsuccess = () => resolveUpdate();
                     putRequest.onerror = () => rejectUpdate(putRequest.error);
                 } else {
-                    resolveUpdate(); // Product might have been deleted but was in a sale
+                    // Product might have been deleted but was in a sale, store with 0 cost
+                     (saleToSave.items as SaleItem[]).push({
+                        ...item,
+                        totalCost: 0
+                    });
+                    resolveUpdate();
                 }
             };
             getRequest.onerror = () => rejectUpdate(getRequest.error);
@@ -226,6 +241,13 @@ export const addSale = async (sale: Sale, newCustomerName?: string): Promise<voi
     });
 
     await Promise.all(productUpdates);
+    
+    // Save the sale
+    await new Promise<void>((resolve, reject) => {
+        const req = saleStore.add(saleToSave);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
 };
 
   

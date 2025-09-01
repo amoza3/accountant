@@ -30,6 +30,7 @@ export interface SaleItem {
   productName: string;
   quantity: number;
   price: number; // Price at the time of sale
+  totalCost: number; // Total cost at the time of sale
 }
 
 export interface Sale {

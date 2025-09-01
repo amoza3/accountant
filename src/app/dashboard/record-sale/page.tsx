@@ -47,7 +47,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
 export default function RecordSalePage() {
-  const [cart, setCart] = useState<SaleItem[]>([]);
+  const [cart, setCart] = useState<Omit<SaleItem, 'totalCost'>[]>([]);
   const [barcode, setBarcode] = useState('');
   const barcodeRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
