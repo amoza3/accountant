@@ -1,15 +1,16 @@
 'use client';
 
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense } from '@/lib/types';
 import { calculateTotalCostInToman } from '@/lib/utils';
 
 const DB_NAME = 'EasyStockDB';
-const DB_VERSION = 3; // Incremented version
+const DB_VERSION = 4; // Incremented version
 const PRODUCT_STORE = 'products';
 const SALE_STORE = 'sales';
 const SETTINGS_STORE = 'settings';
 const COST_TITLES_STORE = 'costTitles';
 const CUSTOMER_STORE = 'customers';
+const EXPENSE_STORE = 'expenses';
 
 
 let db: IDBDatabase;
@@ -49,6 +50,9 @@ export const openDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(CUSTOMER_STORE)) {
         db.createObjectStore(CUSTOMER_STORE, { keyPath: 'id' });
       }
+       if (!db.objectStoreNames.contains(EXPENSE_STORE)) {
+        db.createObjectStore(EXPENSE_STORE, { keyPath: 'id' });
+      }
     };
   });
 };
@@ -57,6 +61,38 @@ const getStore = (storeName: string, mode: IDBTransactionMode) => {
   const tx = db.transaction(storeName, mode);
   return tx.objectStore(storeName);
 };
+
+// Expense Operations
+export const addExpense = (expense: Expense): Promise<void> => {
+  return new Promise(async (resolve, reject) => {
+    const db = await openDB();
+    const store = getStore(EXPENSE_STORE, 'readwrite');
+    const request = store.add(expense);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getAllExpenses = (): Promise<Expense[]> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(EXPENSE_STORE, 'readonly');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const deleteExpense = (id: string): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(EXPENSE_STORE, 'readwrite');
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
 
 // Customer Operations
 export const addCustomer = (customer: Customer): Promise<void> => {

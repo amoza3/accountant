@@ -10,7 +10,8 @@ import {
   FileText,
   Settings,
   History,
-  Users
+  Users,
+  Receipt
 } from 'lucide-react';
 import {
   Sidebar,
@@ -50,6 +51,11 @@ export function MainSidebar({ appName }: { appName: string }) {
         href: `/dashboard/customers`,
         label: 'مشتریان',
         icon: Users,
+    },
+    {
+      href: `/dashboard/expenses`,
+      label: 'مخارج',
+      icon: Receipt,
     },
     {
       href: `/dashboard/reports`,

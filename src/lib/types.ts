@@ -52,3 +52,10 @@ export interface CostTitle {
   id: string;
   title: string;
 }
+
+export interface Expense {
+  id: string;
+  title: string;
+  amount: number;
+  date: string;
+}
