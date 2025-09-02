@@ -56,7 +56,7 @@ export function useChangeLocale() {
       pathParts[idx] = nextLocale;
     }
     const nextPath = pathParts.join('/') || `/${nextLocale}`;
-    router.push(nextPath);
+    router.push(encodeURI(nextPath));
   };
 }
 

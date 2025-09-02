@@ -2,12 +2,9 @@ import type { ReactNode } from 'react';
 import { MainSidebar } from '@/components/layout/main-sidebar';
 import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { PanelLeft } from 'lucide-react';
-import { getI18n } from '@/lib/i18n/server';
 
-
-export default async function DashboardLayout({ children, params: { locale } }: { children: ReactNode, params: { locale: string } }) {
-  const { t } = await getI18n(locale);
-  const appName = t('app_name');
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+    const appName = "ایزی استاک";
   return (
     <div className="flex min-h-screen">
       <MainSidebar appName={appName} />
