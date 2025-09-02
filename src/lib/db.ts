@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense, Employee, Attachment, Payment, AttachmentSource } from '@/lib/types';
@@ -157,18 +158,21 @@ export const getPaymentsByIds = (ids: string[]): Promise<Payment[]> => {
         const store = getStore(PAYMENT_STORE, 'readonly');
         const results: Payment[] = [];
         let count = 0;
-        if (ids.length === 0) {
+        
+        const validIds = ids.filter(id => !!id);
+        if (validIds.length === 0) {
             resolve([]);
             return;
         }
-        ids.forEach(id => {
+
+        validIds.forEach(id => {
             const request = store.get(id);
             request.onsuccess = () => {
                 if (request.result) {
                     results.push(request.result);
                 }
                 count++;
-                if (count === ids.length) {
+                if (count === validIds.length) {
                     resolve(results);
                 }
             };
@@ -670,3 +674,4 @@ export const deleteCostTitle = (id: string): Promise<void> => {
         request.onerror = () => reject(request.error);
     });
 };
+
