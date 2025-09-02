@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -34,10 +35,10 @@ export default function ReportsPage() {
       setIsLoading(true);
       try {
         const [allSales, allExpenses] = await Promise.all([getAllSales(), getAllExpenses()]);
+        const paymentIds = allSales.flatMap(s => s.paymentIds || []);
+        const allPayments = await getPaymentsByIds(paymentIds);
         setSales(allSales);
         setExpenses(allExpenses);
-        const paymentIds = allSales.flatMap(s => s.paymentIds);
-        const allPayments = await getPaymentsByIds(paymentIds);
         setPayments(allPayments);
       } catch (error) {
         toast({
@@ -147,7 +148,7 @@ export default function ReportsPage() {
     }, 0);
     const expensesSum = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const totalPaid = filteredSales.reduce((total, sale) => {
-        const salePayments = payments.filter(p => sale.paymentIds.includes(p.id));
+        const salePayments = payments.filter(p => (sale.paymentIds || []).includes(p.id));
         return total + salePayments.reduce((sum, p) => sum + p.amount, 0);
     }, 0);
     const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0);

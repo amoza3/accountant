@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -46,7 +47,7 @@ export default function SalesHistoryPage() {
         const allSales = await getAllSales();
         const salesDetails: SaleWithDetails[] = await Promise.all(
             allSales.map(async (sale) => {
-                const payments = await getPaymentsByIds(sale.paymentIds);
+                const payments = await getPaymentsByIds(sale.paymentIds || []);
                 const paymentsWithAttachments = await Promise.all(payments.map(async (payment) => {
                     const attachments = await getAttachmentsBySourceId(payment.id);
                     return { ...payment, attachments };
@@ -134,6 +135,7 @@ export default function SalesHistoryPage() {
                             </div>
                             <div>
                                 <h4 className="font-semibold mb-2">پرداخت‌ها</h4>
+                                {sale.payments.length > 0 ? (
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -172,6 +174,7 @@ export default function SalesHistoryPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                ) : (<p className="text-sm text-muted-foreground">پرداختی ثبت نشده است.</p>)}
                             </div>
                         </div>
 
