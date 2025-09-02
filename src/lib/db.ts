@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense, Employee, Attachment, Payment, AttachmentSource } from '@/lib/types';
@@ -365,9 +366,10 @@ export const updateExpense = async (expense: Expense, newAttachments: Omit<Attac
         return attachmentId;
     });
 
-    const finalAttachmentIds = (expense.attachmentIds || [])
-      .filter(id => !deletedAttachmentIds.includes(id))
-      .concat(newAttachmentIds);
+    const existingAttachmentIds = (expense.attachmentIds || [])
+      .filter(id => !deletedAttachmentIds.includes(id));
+      
+    const finalAttachmentIds = existingAttachmentIds.concat(newAttachmentIds);
 
     const updatedExpense: Expense = { ...expense, attachmentIds: finalAttachmentIds };
     expenseStore.put(updatedExpense);
@@ -674,4 +676,5 @@ export const deleteCostTitle = (id: string): Promise<void> => {
         request.onerror = () => reject(request.error);
     });
 };
+
 

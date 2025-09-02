@@ -13,9 +13,7 @@ import {
   addRecurringExpense,
   deleteRecurringExpense,
   applyRecurringExpenses,
-  addAttachment,
   getAttachmentsBySourceId,
-  deleteAttachment,
   updateExpense
 } from '@/lib/db';
 import type { Expense, RecurringExpense, RecurringExpenseFrequency, Attachment } from '@/lib/types';
@@ -180,6 +178,12 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
         date: expenseToEdit.date.slice(0, 16)
     } : { title: '', amount: 0, date: new Date().toISOString().slice(0, 16) },
   });
+  
+  useEffect(() => {
+    if (expenseToEdit) {
+      setAttachments(expenseToEdit.attachments || []);
+    }
+  }, [expenseToEdit]);
 
   const handleAddAttachment = (data: z.infer<typeof attachmentSchema>) => {
       setAttachments([...attachments, { ...data, id: `new-${Date.now()}`}]);
