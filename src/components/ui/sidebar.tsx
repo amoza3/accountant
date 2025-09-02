@@ -4,6 +4,8 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -206,6 +208,12 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            <VisuallyHidden asChild>
+                <DialogPrimitive.Title>Main Navigation</DialogPrimitive.Title>
+            </VisuallyHidden>
+            <VisuallyHidden asChild>
+                <DialogPrimitive.Description>The main navigation for the application.</DialogPrimitive.Description>
+            </VisuallyHidden>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
