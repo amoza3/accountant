@@ -75,6 +75,12 @@ const paymentFormSchema = z.object({
   date: z.string().min(1, 'تاریخ پرداخت الزامی است'),
 });
 
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+    CASH: 'نقد',
+    CARD: 'کارتخوان',
+    ONLINE: 'آنلاین',
+};
+
 function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void }) {
     const form = useForm<z.infer<typeof attachmentSchema>>({
         resolver: zodResolver(attachmentSchema),
@@ -261,11 +267,6 @@ export default function RecordSalePage() {
   type TempPayment = Omit<Payment, 'id'> & { attachments: Omit<Attachment, 'id'|'sourceId'|'sourceType'>[] };
   const [payments, setPayments] = useState<TempPayment[]>([]);
 
-  const paymentMethodLabels: Record<PaymentMethod, string> = {
-    CASH: 'نقد',
-    CARD: 'کارتخوان',
-    ONLINE: 'آنلاین',
-  };
   
   useEffect(() => {
     barcodeRef.current?.focus();
