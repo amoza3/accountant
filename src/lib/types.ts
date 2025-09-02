@@ -10,7 +10,7 @@ export interface Attachment {
   date: string; // ISO string
   description?: string;
   receiptNumber?: string;
-  receiptImage?: string; // Base64 encoded image
+  receiptImage?: string; // URL to the image in storage
 }
 
 export interface ProductCost {

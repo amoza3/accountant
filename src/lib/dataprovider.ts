@@ -45,6 +45,7 @@ export interface DataProvider {
 
   // Attachment Operations
   getAttachmentsBySourceId: (sourceId: string) => Promise<Attachment[]>;
+  uploadFile: (file: File) => Promise<string>;
   
   // Payment Operations
   addPayment: (paymentData: Omit<Payment, 'id' | 'attachmentIds'>, attachments: Omit<Attachment, 'id'| 'sourceId' | 'sourceType'>[]) => Promise<string>;

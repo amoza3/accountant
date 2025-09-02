@@ -1,6 +1,6 @@
 'use client';
 
-import { db } from './firebase';
+import { db, storage } from './firebase';
 import {
     collection,
     doc,
@@ -13,6 +13,7 @@ import {
     query,
     where
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AttachmentSource } from '@/lib/types';
 import type { DataProvider } from './dataprovider';
 import { calculateTotalCostInToman } from './utils';
@@ -313,6 +314,12 @@ export const FirestoreDataProvider: DataProvider = {
     const q = query(collection(db, ATTACHMENTS_COLLECTION), where("sourceId", "==", sourceId));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Attachment);
+  },
+  uploadFile: async (file: File): Promise<string> => {
+    const storageRef = ref(storage, `attachments/${Date.now()}-${file.name}`);
+    const snapshot = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return downloadURL;
   },
   
   // Payment Operations
