@@ -32,11 +32,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addProduct, getProductById, getCostTitles, getExchangeRates } from '@/lib/db';
 import type { Product, CostTitle, ExchangeRate, ProductCost } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { calculateSellingPrice, CURRENCY_SYMBOLS, calculateTotalCostInToman } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { useAppContext } from '@/components/app-provider';
 
 const productSchema = z.object({
   id: z.string().min(1, 'بارکد الزامی است'),
@@ -61,16 +61,18 @@ export default function AddProductPage() {
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
+  const { db } = useAppContext();
 
   useEffect(() => {
     barcodeRef.current?.focus();
     async function fetchData() {
-      const [titles, rates] = await Promise.all([getCostTitles(), getExchangeRates()]);
+        if (!db) return;
+      const [titles, rates] = await Promise.all([db.getCostTitles(), db.getExchangeRates()]);
       setCostTitles(titles);
       setExchangeRates(rates);
     }
     fetchData();
-  }, []);
+  }, [db]);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -101,8 +103,9 @@ export default function AddProductPage() {
   }, [watchedValues, exchangeRates]);
 
   const onSubmit: SubmitHandler<z.infer<typeof productSchema>> = async (data) => {
+    if (!db) return;
     try {
-      const existingProduct = await getProductById(data.id);
+      const existingProduct = await db.getProductById(data.id);
       if (existingProduct) {
         toast({
           variant: 'destructive',
@@ -119,7 +122,7 @@ export default function AddProductPage() {
         price: finalPrice,
       };
 
-      await addProduct(newProduct);
+      await db.addProduct(newProduct);
 
       toast({
         title: 'محصول اضافه شد',

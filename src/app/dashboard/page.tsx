@@ -2,15 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { PlusCircle, Download, Trash2, Pencil } from 'lucide-react';
-import {
-  getAllProducts,
-  deleteProduct,
-  updateProduct,
-  getExchangeRates,
-  getCostTitles,
-  applyRecurringExpenses,
-} from '@/lib/db';
+import { PlusCircle, Download, Trash2, Pencil, Loader2 } from 'lucide-react';
+
 import type { Product, ExchangeRate, CostTitle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,13 +40,12 @@ import {
 import { Label } from '@/components/ui/label';
 import { calculateTotalCostInToman, CURRENCY_SYMBOLS, calculateSellingPrice } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -66,6 +58,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAppContext } from '@/components/app-provider';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 const productSchema = z.object({
   id: z.string().min(1, 'بارکد الزامی است'),
@@ -96,6 +91,7 @@ function EditProductForm({
   costTitles: CostTitle[];
 }) {
   const { toast } = useToast();
+  const { db } = useAppContext();
   const [calculatedPrice, setCalculatedPrice] = useState(product.price);
   
   const form = useForm<z.infer<typeof productSchema>>({
@@ -123,9 +119,10 @@ function EditProductForm({
 
 
   const handleSubmit = async (data: z.infer<typeof productSchema>) => {
+    if(!db) return;
     try {
       const finalPrice = calculateSellingPrice({...data, price: 0} as Product, exchangeRates);
-      await updateProduct(product.id, { 
+      await db.updateProduct(product.id, { 
         ...data,
         price: finalPrice
       });
@@ -412,18 +409,22 @@ function ProductCard({
 }
 
 export default function InventoryPage() {
+  const { db, isLoading: isDbLoading } = useAppContext();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
 
   const fetchProducts = async () => {
+    if (!db) return;
+    setIsDataLoading(true);
     try {
       const [allProducts, rates, titles] = await Promise.all([
-        getAllProducts(), 
-        getExchangeRates(),
-        getCostTitles()
+        db.getAllProducts(), 
+        db.getExchangeRates(),
+        db.getCostTitles()
       ]);
       setProducts(allProducts.sort((a, b) => a.name.localeCompare(b.name)));
       setExchangeRates(rates);
@@ -434,35 +435,40 @@ export default function InventoryPage() {
         title: 'خطا',
         description: 'بارگذاری محصولات از پایگاه داده ناموفق بود.',
       });
+    } finally {
+        setIsDataLoading(false);
     }
   };
 
   useEffect(() => {
-    const checkRecurringExpenses = async () => {
-        try {
-            const addedCount = await applyRecurringExpenses();
-            if (addedCount > 0) {
-                toast({
-                    title: 'هزینه‌های دوره‌ای ثبت شد',
-                    description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
+    if (db) {
+        const checkRecurringExpenses = async () => {
+            try {
+                const addedCount = await db.applyRecurringExpenses();
+                if (addedCount > 0) {
+                    toast({
+                        title: 'هزینه‌های دوره‌ای ثبت شد',
+                        description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
+                    });
+                }
+            } catch(error) {
+                 console.error("Failed to apply recurring expenses:", error);
+                 toast({
+                    variant: 'destructive',
+                    title: 'خطا در ثبت خودکار هزینه‌ها',
+                    description: 'سیستم نتوانست هزینه‌های دوره‌ای را بررسی و ثبت کند.',
                 });
             }
-        } catch(error) {
-             console.error("Failed to apply recurring expenses:", error);
-             toast({
-                variant: 'destructive',
-                title: 'خطا در ثبت خودکار هزینه‌ها',
-                description: 'سیستم نتوانست هزینه‌های دوره‌ای را بررسی و ثبت کند.',
-            });
-        }
-    };
-    
-    checkRecurringExpenses().then(() => fetchProducts());
-  }, []);
+        };
+        
+        checkRecurringExpenses().then(() => fetchProducts());
+    }
+  }, [db]);
 
   const handleDelete = async (id: string) => {
+    if (!db) return;
     try {
-      await deleteProduct(id);
+      await db.deleteProduct(id);
       toast({
         title: 'محصول حذف شد',
         description: 'محصول با موفقیت حذف شد.',
@@ -505,6 +511,8 @@ export default function InventoryPage() {
     );
   }, [products, searchTerm]);
 
+  const isLoading = isDbLoading || isDataLoading;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
@@ -532,7 +540,11 @@ export default function InventoryPage() {
         />
       </div>
 
-      {filteredProducts.length > 0 ? (
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
+        </div>
+      ) : filteredProducts.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((product) => (
             <ProductCard

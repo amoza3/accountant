@@ -5,17 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw, Paperclip, Pencil } from 'lucide-react';
-import {
-  getAllExpenses,
-  addExpense,
-  deleteExpense,
-  getAllRecurringExpenses,
-  addRecurringExpense,
-  deleteRecurringExpense,
-  applyRecurringExpenses,
-  getAttachmentsBySourceId,
-  updateExpense
-} from '@/lib/db';
 import type { Expense, RecurringExpense, RecurringExpenseFrequency, Attachment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,6 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { useAppContext } from '@/components/app-provider';
 
 const attachmentSchema = z.object({
   description: z.string().optional(),
@@ -169,6 +159,7 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
 
 function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onExpenseAdded: () => void, expenseToEdit?: Expense & { attachments?: Attachment[]}, onExpenseUpdated?: () => void }) {
   const { toast } = useToast();
+  const { db } = useAppContext();
   const [attachments, setAttachments] = useState<Partial<Attachment>[]>(expenseToEdit?.attachments || []);
   const [deletedAttachmentIds, setDeletedAttachmentIds] = useState<string[]>([]);
   const form = useForm<z.infer<typeof expenseSchema>>({
@@ -197,17 +188,18 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
   }
 
   const onSubmit = async (data: z.infer<typeof expenseSchema>) => {
+    if (!db) return;
     try {
         const newAttachmentsData = attachments
             .filter(att => att.id?.startsWith('new-'))
             .map(({id, ...rest}) => rest) as Omit<Attachment, 'id'|'sourceId'|'sourceType'>[];
 
         if (expenseToEdit && onExpenseUpdated) {
-            await updateExpense({ ...expenseToEdit, ...data}, newAttachmentsData, deletedAttachmentIds);
+            await db.updateExpense({ ...expenseToEdit, ...data}, newAttachmentsData, deletedAttachmentIds);
             toast({ title: 'موفق', description: 'هزینه با موفقیت بروزرسانی شد.' });
             onExpenseUpdated();
         } else {
-            await addExpense({
+            await db.addExpense({
                 ...data,
             }, newAttachmentsData);
             toast({ title: 'موفق', description: 'هزینه جدید با موفقیت ثبت شد.' });
@@ -310,16 +302,18 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
 
 function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseAdded: () => void }) {
     const { toast } = useToast();
+    const { db } = useAppContext();
     const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
 
     const fetchRecurringExpenses = async () => {
-        const expenses = await getAllRecurringExpenses();
+        if (!db) return;
+        const expenses = await db.getAllRecurringExpenses();
         setRecurringExpenses(expenses);
     };
 
     useEffect(() => {
         fetchRecurringExpenses();
-    }, []);
+    }, [db]);
 
     const form = useForm<z.infer<typeof recurringExpenseSchema>>({
         resolver: zodResolver(recurringExpenseSchema),
@@ -327,6 +321,7 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
     });
 
     const onSubmit = async (data: z.infer<typeof recurringExpenseSchema>) => {
+        if (!db) return;
         try {
         const newRecurringExpense: RecurringExpense = {
             id: Date.now().toString(),
@@ -334,7 +329,7 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
             frequency: data.frequency as RecurringExpenseFrequency,
             startDate: new Date(data.startDate).toISOString(),
         };
-        await addRecurringExpense(newRecurringExpense);
+        await db.addRecurringExpense(newRecurringExpense);
         toast({ title: 'موفق', description: 'هزینه دوره‌ای جدید تعریف شد.' });
         form.reset({ title: '', amount: 0, startDate: new Date().toISOString().split('T')[0] });
         fetchRecurringExpenses();
@@ -345,8 +340,9 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
     };
     
     const handleDelete = async (id: string) => {
+        if (!db) return;
         try {
-            await deleteRecurringExpense(id);
+            await db.deleteRecurringExpense(id);
             toast({ title: 'موفق', description: 'هزینه دوره‌ای حذف شد.' });
             fetchRecurringExpenses();
              onRecurringExpenseAdded();
@@ -462,6 +458,26 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
 
 function ExpenseListItem({ expense, onUpdate }: { expense: Expense & { attachments: Attachment[] }, onUpdate: () => void }) {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const { db } = useAppContext();
+    const { toast } = useToast();
+
+     const handleDelete = async (id: string) => {
+        if (!db) return;
+        try {
+            await db.deleteExpense(id);
+            toast({
+            title: 'هزینه حذف شد',
+            description: 'هزینه با موفقیت حذف شد.',
+            });
+            onUpdate();
+        } catch (error) {
+            toast({
+            variant: 'destructive',
+            title: 'خطا',
+            description: 'حذف هزینه ناموفق بود.',
+            });
+        }
+    };
 
     return (
         <li className="flex items-center justify-between p-4">
@@ -532,7 +548,7 @@ function ExpenseListItem({ expense, onUpdate }: { expense: Expense & { attachmen
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>لغو</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => (window as any).handleDeleteExpense(expense.id)}>
+                            <AlertDialogAction onClick={() => handleDelete(expense.id)}>
                                 حذف
                             </AlertDialogAction>
                         </AlertDialogFooter>
@@ -544,15 +560,17 @@ function ExpenseListItem({ expense, onUpdate }: { expense: Expense & { attachmen
 }
 
 export default function ExpensesPage() {
+  const { db } = useAppContext();
   const [expenses, setExpenses] = useState<(Expense & { attachments: Attachment[] })[]>([]);
   const [isProcessingRecurring, setIsProcessingRecurring] = useState(false);
   const { toast } = useToast();
 
   const fetchExpenses = async () => {
+    if (!db) return;
     try {
-        const allExpenses = await getAllExpenses();
+        const allExpenses = await db.getAllExpenses();
         const expensesWithAttachments = await Promise.all(allExpenses.map(async (exp) => {
-            const attachments = await getAttachmentsBySourceId(exp.id);
+            const attachments = await db.getAttachmentsBySourceId(exp.id);
             return { ...exp, attachments };
         }));
         setExpenses(expensesWithAttachments);
@@ -566,9 +584,10 @@ export default function ExpensesPage() {
   };
   
   const handleApplyRecurring = async () => {
+      if (!db) return;
       setIsProcessingRecurring(true);
       try {
-        const addedCount = await applyRecurringExpenses();
+        const addedCount = await db.applyRecurringExpenses();
         if (addedCount > 0) {
             toast({
                 title: 'هزینه‌های دوره‌ای اعمال شد',
@@ -594,29 +613,10 @@ export default function ExpensesPage() {
   }
 
   useEffect(() => {
-    fetchExpenses();
-    
-    (window as any).handleDeleteExpense = async (id: string) => {
-      try {
-        await deleteExpense(id);
-        toast({
-          title: 'هزینه حذف شد',
-          description: 'هزینه با موفقیت حذف شد.',
-        });
+    if (db) {
         fetchExpenses();
-      } catch (error) {
-        toast({
-          variant: 'destructive',
-          title: 'خطا',
-          description: 'حذف هزینه ناموفق بود.',
-        });
-      }
-    };
-
-    return () => {
-        delete (window as any).handleDeleteExpense;
     }
-  }, []);
+  }, [db]);
 
   return (
     <div className="grid md:grid-cols-3 gap-8">

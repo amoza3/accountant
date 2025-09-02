@@ -3,13 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { PlusCircle, Download, Trash2, Pencil } from 'lucide-react';
-import {
-  getAllProducts,
-  deleteProduct,
-  updateProduct,
-  getExchangeRates,
-} from '@/lib/db';
-import type { Product, ExchangeRate } from '@/lib/types';
+import type { Product, ExchangeRate, CostTitle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,48 +37,98 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { calculateTotalCostInToman, CURRENCY_SYMBOLS } from '@/lib/utils';
+import { calculateTotalCostInToman, CURRENCY_SYMBOLS, calculateSellingPrice } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { useI18n, useCurrentLocale } from '@/lib/i18n/client';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useAppContext } from '@/components/app-provider';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const productSchema = z.object({
+  id: z.string().min(1, 'بارکد الزامی است'),
+  name: z.string().min(1, 'نام محصول الزامی است'),
+  quantity: z.coerce.number().min(0, 'تعداد نمی‌تواند منفی باشد'),
+  lowStockThreshold: z.coerce.number().min(0, 'آستانه نمی‌تواند منفی باشد'),
+  profitMargin: z.coerce.number().min(0, 'حاشیه سود نمی‌تواند منفی باشد'),
+  costs: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      amount: z.coerce.number().min(0, 'مبلغ نمی‌تواند منفی باشد'),
+      currency: z.enum(['TOMAN', 'USD', 'AED', 'CNY']),
+    })
+  ),
+});
+
 
 function EditProductForm({
   product,
   onSuccess,
   exchangeRates,
+  costTitles
 }: {
   product: Product;
   onSuccess: () => void;
   exchangeRates: ExchangeRate[];
+  costTitles: CostTitle[];
 }) {
   const { t } = useI18n();
   const { toast } = useToast();
-  const [name, setName] = useState(product.name);
-  const [quantity, setQuantity] = useState(product.quantity);
-  const [lowStockThreshold, setLowStockThreshold] = useState(product.lowStockThreshold);
-  const [profitMargin, setProfitMargin] = useState(product.profitMargin);
+  const { db } = useAppContext();
+  const [calculatedPrice, setCalculatedPrice] = useState(product.price);
+  
+  const form = useForm<z.infer<typeof productSchema>>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      ...product,
+    },
+  });
 
-  const totalCost = useMemo(() => calculateTotalCostInToman(product.costs, exchangeRates)
-  , [product.costs, exchangeRates]);
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "costs",
+  });
 
-  const sellingPrice = useMemo(() => {
-    const profit = totalCost * (profitMargin / 100);
-    return totalCost + profit;
-  }, [totalCost, profitMargin]);
+  const watchedValues = form.watch();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    const productData = {
+        ...watchedValues,
+        price: 0
+    } as Product
+    const newPrice = calculateSellingPrice(productData, exchangeRates);
+    setCalculatedPrice(newPrice);
+  }, [watchedValues, exchangeRates]);
+
+
+  const handleSubmit = async (data: z.infer<typeof productSchema>) => {
+    if(!db) return;
     try {
-      await updateProduct({ 
-        ...product, 
-        name, 
-        quantity, 
-        lowStockThreshold,
-        profitMargin,
-        price: sellingPrice
+      const finalPrice = calculateSellingPrice({...data, price: 0} as Product, exchangeRates);
+      await db.updateProduct(product.id, { 
+        ...data,
+        price: finalPrice
       });
       toast({
         title: t('inventory.edit_product.toasts.success.title'),
-        description: t('inventory.edit_product.toasts.success.description', { name }),
+        description: t('inventory.edit_product.toasts.success.description', { name: data.name }),
       });
       onSuccess();
     } catch (error) {
@@ -97,33 +141,146 @@ function EditProductForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="edit-name">{t('inventory.edit_product.form.product_name')}</Label>
-        <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />
-      </div>
+    <Form {...form}>
+    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto p-4">
+      <FormField
+        control={form.control}
+        name="name"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>{t('inventory.edit_product.form.product_name')}</FormLabel>
+            <FormControl>
+              <Input {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
       <div className="grid grid-cols-2 gap-4">
-        <div>
-            <Label htmlFor="edit-quantity">{t('inventory.edit_product.form.quantity')}</Label>
-            <Input id="edit-quantity" type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} required />
+        <FormField
+          control={form.control}
+          name="quantity"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t('inventory.edit_product.form.quantity')}</FormLabel>
+              <FormControl>
+                <Input type="number" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="lowStockThreshold"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t('inventory.edit_product.form.low_stock_threshold')}</FormLabel>
+              <FormControl>
+                <Input type="number" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <Separator />
+
+        <div className="space-y-4">
+            <h3 className="text-lg font-medium">{t('add_product.costs_section.title')}</h3>
+            {fields.map((field, index) => (
+                <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
+                    <FormField
+                    control={form.control}
+                    name={`costs.${index}.title`}
+                    render={({ field: selectField }) => (
+                        <FormItem className="w-1/3">
+                            <FormLabel>{t('add_product.costs_section.cost_title.label')}</FormLabel>
+                            <Select onValueChange={selectField.onChange} defaultValue={selectField.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={t('add_product.costs_section.cost_title.placeholder')} />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                {costTitles.map(ct => (
+                                    <SelectItem key={ct.id} value={ct.title}>{ct.title}</SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name={`costs.${index}.amount`}
+                    render={({ field }) => (
+                        <FormItem className="w-1/3">
+                        <FormLabel>{t('add_product.costs_section.amount.label')}</FormLabel>
+                        <FormControl><Input type="number" placeholder="100" {...field} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name={`costs.${index}.currency`}
+                    render={({ field }) => (
+                        <FormItem className="w-1/3">
+                        <FormLabel>{t('add_product.costs_section.currency.label')}</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger><SelectValue placeholder={t('add_product.costs_section.currency.placeholder')} /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
+                                <SelectItem key={code} value={code}>{code} ({symbol})</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                    <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+            ))}
+            <Button
+                type="button"
+                variant="outline"
+                onClick={() => append({ id: Date.now().toString(), title: costTitles[0]?.title || '', amount: 0, currency: 'TOMAN' })}
+            >
+                <PlusCircle className="mr-2 h-4 w-4" /> {t('add_product.costs_section.add_cost_button')}
+            </Button>
         </div>
-        <div>
-            <Label htmlFor="edit-lowStockThreshold">{t('inventory.edit_product.form.low_stock_threshold')}</Label>
-            <Input id="edit-lowStockThreshold" type="number" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(Number(e.target.value))} required />
+
+      <Separator />
+
+      <FormField
+        control={form.control}
+        name="profitMargin"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>{t('inventory.edit_product.form.profit_margin')}</FormLabel>
+            <FormControl>
+              <Input type="number" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+       <div className="p-4 border rounded-md bg-muted">
+            <p className="text-sm text-muted-foreground">{t('add_product.pricing_section.calculated_price.label')}</p>
+            <p className="text-2xl font-bold">
+                {calculatedPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
+            </p>
         </div>
-      </div>
-      <div>
-        <Label>{t('inventory.edit_product.form.total_cost')}</Label>
-        <p className="font-bold text-lg">{totalCost.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</p>
-      </div>
-       <div>
-        <Label htmlFor="edit-profitMargin">{t('inventory.edit_product.form.profit_margin')}</Label>
-        <Input id="edit-profitMargin" type="number" value={profitMargin} onChange={(e) => setProfitMargin(Number(e.target.value))} required />
-      </div>
-       <div>
-        <Label>{t('inventory.edit_product.form.final_selling_price')}</Label>
-        <p className="font-bold text-xl">{sellingPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</p>
-      </div>
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="outline">{t('common.cancel')}</Button>
@@ -131,6 +288,7 @@ function EditProductForm({
         <Button type="submit">{t('common.save_changes')}</Button>
       </DialogFooter>
     </form>
+    </Form>
   );
 }
 
@@ -138,12 +296,14 @@ function ProductCard({
   product,
   onDelete,
   onUpdate,
-  exchangeRates
+  exchangeRates,
+  costTitles,
 }: {
   product: Product;
   onDelete: (id: string) => void;
   onUpdate: () => void;
   exchangeRates: ExchangeRate[];
+  costTitles: CostTitle[];
 }) {
   const { t } = useI18n();
   const isLowStock = product.quantity <= product.lowStockThreshold;
@@ -199,10 +359,15 @@ function ProductCard({
             <DialogHeader>
               <DialogTitle>{t('inventory.edit_product.title')}</DialogTitle>
             </DialogHeader>
-            <EditProductForm product={product} exchangeRates={exchangeRates} onSuccess={() => {
-              onUpdate();
-              setIsEditDialogOpen(false);
-            }} />
+             <EditProductForm 
+                product={product} 
+                exchangeRates={exchangeRates} 
+                costTitles={costTitles}
+                onSuccess={() => {
+                    onUpdate();
+                    setIsEditDialogOpen(false);
+                }} 
+            />
           </DialogContent>
         </Dialog>
         <AlertDialog>
@@ -232,34 +397,68 @@ function ProductCard({
 }
 
 export default function InventoryPage() {
+  const { db, isLoading: isDbLoading } = useAppContext();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
+  const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
   const { t } = useI18n();
   const locale = useCurrentLocale();
-
+  
   const fetchProducts = async () => {
+    if (!db) return;
+    setIsDataLoading(true);
     try {
-      const [allProducts, rates] = await Promise.all([getAllProducts(), getExchangeRates()]);
+      const [allProducts, rates, titles] = await Promise.all([
+        db.getAllProducts(),
+        db.getExchangeRates(),
+        db.getCostTitles(),
+      ]);
       setProducts(allProducts.sort((a, b) => a.name.localeCompare(b.name)));
       setExchangeRates(rates);
+      setCostTitles(titles);
     } catch (error) {
       toast({
         variant: 'destructive',
         title: t('inventory.toasts.load_error.title'),
         description: t('inventory.toasts.load_error.description'),
       });
+    } finally {
+      setIsDataLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (db) {
+        const checkRecurringExpenses = async () => {
+            try {
+                const addedCount = await db.applyRecurringExpenses();
+                if (addedCount > 0) {
+                    toast({
+                        title: t('inventory.toasts.recurring_applied.title'),
+                        description: t('inventory.toasts.recurring_applied.description', { count: addedCount }),
+                    });
+                }
+            } catch(error) {
+                 console.error("Failed to apply recurring expenses:", error);
+                 toast({
+                    variant: 'destructive',
+                    title: t('inventory.toasts.recurring_error.title'),
+                    description: t('inventory.toasts.recurring_error.description'),
+                });
+            }
+        };
+        
+        checkRecurringExpenses().then(() => fetchProducts());
+    }
+  }, [db]);
 
   const handleDelete = async (id: string) => {
+    if (!db) return;
     try {
-      await deleteProduct(id);
+      await db.deleteProduct(id);
       toast({
         title: t('inventory.toasts.delete_success.title'),
         description: t('inventory.toasts.delete_success.description'),
@@ -302,6 +501,8 @@ export default function InventoryPage() {
     );
   }, [products, searchTerm]);
 
+  const isLoading = isDbLoading || isDataLoading;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
@@ -329,7 +530,11 @@ export default function InventoryPage() {
         />
       </div>
 
-      {filteredProducts.length > 0 ? (
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
+        </div>
+      ) : filteredProducts.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((product) => (
             <ProductCard
@@ -338,6 +543,7 @@ export default function InventoryPage() {
               onDelete={handleDelete}
               onUpdate={fetchProducts}
               exchangeRates={exchangeRates}
+              costTitles={costTitles}
             />
           ))}
         </div>

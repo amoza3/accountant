@@ -4,13 +4,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
-import { getAllSales, getAllExpenses, getPaymentsByIds } from '@/lib/db';
 import type { Sale, Expense, Payment } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CURRENCY_SYMBOLS } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAppContext } from '@/components/app-provider';
 
 type TimeRange = 'all' | 'last_year' | 'this_year' | 'last_month' | 'this_month' | 'last_week' | 'this_week';
 
@@ -29,14 +29,16 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('this_month');
   const { toast } = useToast();
+  const { db } = useAppContext();
 
   useEffect(() => {
+    if (!db) return;
     async function fetchData() {
       setIsLoading(true);
       try {
-        const [allSales, allExpenses] = await Promise.all([getAllSales(), getAllExpenses()]);
+        const [allSales, allExpenses] = await Promise.all([db.getAllSales(), db.getAllExpenses()]);
         const paymentIds = allSales.flatMap(s => s.paymentIds || []);
-        const allPayments = await getPaymentsByIds(paymentIds);
+        const allPayments = await db.getPaymentsByIds(paymentIds);
         setSales(allSales);
         setExpenses(allExpenses);
         setPayments(allPayments);
@@ -51,7 +53,7 @@ export default function ReportsPage() {
       }
     }
     fetchData();
-  }, [toast]);
+  }, [toast, db]);
 
   const { filteredSales, filteredExpenses } = useMemo(() => {
     const now = new Date();

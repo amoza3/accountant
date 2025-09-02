@@ -39,7 +39,6 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { getProductById, addSale, getAllCustomers, getAllProducts, addPayment } from '@/lib/db';
 import type { SaleItem, Customer, PaymentMethod, Product, Payment, Attachment } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
@@ -60,6 +59,7 @@ import {
 } from '@/components/ui/form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { useAppContext } from '@/components/app-provider';
 
 
 const attachmentSchema = z.object({
@@ -228,7 +228,7 @@ function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, '
                 <div className="space-y-2">
                     <Label>اسناد پیوست</Label>
                     {attachments.map((att, i) => (
-                         <div key={i} className="flex items-center justify-between p-2 border rounded-md">
+                         <div key={i} className="flex items-center justify-between p-2 border rounded-md bg-muted">
                             <span>{att.receiptNumber || att.description || 'سند'}</span>
                              <Button type="button" size="icon" variant="ghost" onClick={() => setAttachments(attachments.filter((_, idx) => idx !== i))}>
                                 <Trash2 className="w-4 h-4 text-destructive" />
@@ -255,6 +255,7 @@ export default function RecordSalePage() {
   const barcodeRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const { db } = useAppContext();
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [productSearchTerm, setProductSearchTerm] = useState('');
@@ -269,17 +270,18 @@ export default function RecordSalePage() {
 
   
   useEffect(() => {
+    if (!db) return;
     barcodeRef.current?.focus();
     async function fetchData() {
         const [customers, products] = await Promise.all([
-            getAllCustomers(),
-            getAllProducts()
+            db.getAllCustomers(),
+            db.getAllProducts()
         ]);
         setCustomers(customers);
         setAllProducts(products);
     }
     fetchData();
-  }, []);
+  }, [db]);
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + item.price * item.quantity, 0), [cart]);
   const totalPaid = useMemo(() => payments.reduce((acc, p) => acc + p.amount, 0), [payments]);
@@ -326,10 +328,10 @@ export default function RecordSalePage() {
   }, [toast]);
 
   const handleBarcodeAdd = async (scannedBarcode: string) => {
-    if (!scannedBarcode) return;
+    if (!scannedBarcode || !db) return;
 
     try {
-      const product = await getProductById(scannedBarcode);
+      const product = await db.getProductById(scannedBarcode);
       if (product) {
         handleAddProductToCart(product);
       } else {
@@ -374,6 +376,7 @@ export default function RecordSalePage() {
   }
 
   const completeSale = async () => {
+    if (!db) return;
     if (cart.length === 0) {
       toast({
         variant: 'destructive',
@@ -392,11 +395,11 @@ export default function RecordSalePage() {
         const paymentIds = await Promise.all(
             payments.map(p => {
                 const { attachments, ...paymentData } = p;
-                return addPayment(paymentData, attachments);
+                return db.addPayment(paymentData, attachments);
             })
         );
 
-        await addSale({
+        await db.addSale({
             items: cart,
             total,
             date: new Date().toISOString(),

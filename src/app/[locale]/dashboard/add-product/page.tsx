@@ -32,12 +32,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addProduct, getProductById, getCostTitles, getExchangeRates } from '@/lib/db';
-import type { Product, CostTitle, ExchangeRate } from '@/lib/types';
+import type { Product, CostTitle, ExchangeRate, ProductCost } from '@/lib/types';
 import { useRouter } from 'next/navigation';
-import { calculateSellingPrice, CURRENCY_SYMBOLS } from '@/lib/utils';
+import { calculateSellingPrice, CURRENCY_SYMBOLS, calculateTotalCostInToman } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { useI18n, useCurrentLocale } from '@/lib/i18n/client';
+import { useAppContext } from '@/components/app-provider';
 
 const productSchema = z.object({
   id: z.string().min(1, 'Barcode is required'),
@@ -64,16 +64,18 @@ export default function AddProductPage() {
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
   const { t } = useI18n();
+  const { db } = useAppContext();
 
   useEffect(() => {
     barcodeRef.current?.focus();
     async function fetchData() {
-      const [titles, rates] = await Promise.all([getCostTitles(), getExchangeRates()]);
+        if (!db) return;
+      const [titles, rates] = await Promise.all([db.getCostTitles(), db.getExchangeRates()]);
       setCostTitles(titles);
       setExchangeRates(rates);
     }
     fetchData();
-  }, []);
+  }, [db]);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -104,8 +106,9 @@ export default function AddProductPage() {
   }, [watchedValues, exchangeRates]);
 
   const onSubmit: SubmitHandler<z.infer<typeof productSchema>> = async (data) => {
+    if (!db) return;
     try {
-      const existingProduct = await getProductById(data.id);
+      const existingProduct = await db.getProductById(data.id);
       if (existingProduct) {
         toast({
           variant: 'destructive',
@@ -122,7 +125,7 @@ export default function AddProductPage() {
         price: finalPrice,
       };
 
-      await addProduct(newProduct);
+      await db.addProduct(newProduct);
 
       toast({
         title: t('add_product.toasts.product_added.title'),
@@ -140,6 +143,8 @@ export default function AddProductPage() {
       });
     }
   };
+
+  const totalCost = calculateTotalCostInToman(watchedValues.costs as ProductCost[], exchangeRates);
 
   return (
     <div className="flex justify-center items-start pt-10">
@@ -322,13 +327,13 @@ export default function AddProductPage() {
                             {calculatedPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
                         </p>
                          <FormDescription>
-                            {t('add_product.pricing_section.calculated_price.description')}
+                            {t('add_product.pricing_section.calculated_price.description', { totalCost: totalCost.toLocaleString('fa-IR'), profitMargin: watchedValues.profitMargin })}
                         </FormDescription>
                     </div>
                 </div>
 
 
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || !db}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 {form.formState.isSubmitting ? t('add_product.form.adding_button') : t('add_product.form.add_button')}
               </Button>

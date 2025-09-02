@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { AppProvider } from '@/components/app-provider';
 
 export const metadata: Metadata = {
   title: 'ایزی استاک',
@@ -28,9 +29,11 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
+        <AppProvider>
             <SidebarProvider>
              {children}
             </SidebarProvider>
+        </AppProvider>
           <Toaster />
       </body>
     </html>

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Trash2, PlusCircle, Users } from 'lucide-react';
+import { Trash2, PlusCircle, Users, Database } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -24,19 +24,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import {
-  getExchangeRates,
-  saveExchangeRates,
-  getCostTitles,
-  addCostTitle,
-  deleteCostTitle,
-  addEmployee,
-  getAllEmployees,
-  deleteEmployee
-} from '@/lib/db';
+
 import type { ExchangeRate, CostTitle, Employee } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useI18n } from '@/lib/i18n/client';
+import { useAppContext } from '@/components/app-provider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { StorageType } from '@/hooks/use-db';
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -60,6 +54,7 @@ const employeeSchema = z.object({
 function ExchangeRatesForm() {
   const { t } = useI18n();
   const { toast } = useToast();
+  const { db } = useAppContext();
   const form = useForm<z.infer<typeof exchangeRatesSchema>>({
     resolver: zodResolver(exchangeRatesSchema),
     defaultValues: {
@@ -68,16 +63,18 @@ function ExchangeRatesForm() {
   });
 
   useEffect(() => {
+    if (!db) return;
     async function loadRates() {
-      const rates = await getExchangeRates();
+      const rates = await db.getExchangeRates();
       form.reset({ rates });
     }
     loadRates();
-  }, [form]);
+  }, [form, db]);
 
   const onSubmit = async (data: z.infer<typeof exchangeRatesSchema>) => {
+    if (!db) return;
     try {
-      await saveExchangeRates(data.rates as ExchangeRate[]);
+      await db.saveExchangeRates(data.rates as ExchangeRate[]);
       toast({ title: t('settings.exchange_rates.toasts.success.title'), description: t('settings.exchange_rates.toasts.success.description') });
     } catch (error) {
       toast({
@@ -107,7 +104,7 @@ function ExchangeRatesForm() {
             )}
           />
         ))}
-        <Button type="submit" disabled={form.formState.isSubmitting}>
+        <Button type="submit" disabled={form.formState.isSubmitting || !db}>
           {t('settings.exchange_rates.form.save_button')}
         </Button>
       </form>
@@ -118,6 +115,7 @@ function ExchangeRatesForm() {
 function CostTitlesForm() {
   const { t } = useI18n();
   const { toast } = useToast();
+  const { db } = useAppContext();
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
   const form = useForm<z.infer<typeof costTitleSchema>>({
     resolver: zodResolver(costTitleSchema),
@@ -125,18 +123,20 @@ function CostTitlesForm() {
   });
 
   const fetchCostTitles = async () => {
-    const titles = await getCostTitles();
+    if (!db) return;
+    const titles = await db.getCostTitles();
     setCostTitles(titles);
   };
 
   useEffect(() => {
     fetchCostTitles();
-  }, []);
+  }, [db]);
 
   const onSubmit = async (data: z.infer<typeof costTitleSchema>) => {
+    if (!db) return;
     try {
       const newTitle = { id: Date.now().toString(), title: data.title };
-      await addCostTitle(newTitle);
+      await db.addCostTitle(newTitle);
       toast({ title: t('settings.cost_titles.toasts.success_add.title'), description: t('settings.cost_titles.toasts.success_add.description') });
       form.reset();
       fetchCostTitles();
@@ -150,8 +150,9 @@ function CostTitlesForm() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!db) return;
     try {
-      await deleteCostTitle(id);
+      await db.deleteCostTitle(id);
       toast({ title: t('settings.cost_titles.toasts.success_delete.title'), description: t('settings.cost_titles.toasts.success_delete.description') });
       fetchCostTitles();
     } catch (error) {
@@ -180,7 +181,7 @@ function CostTitlesForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" disabled={form.formState.isSubmitting}>
+          <Button type="submit" disabled={form.formState.isSubmitting || !db}>
             <PlusCircle className="mr-2" /> {t('settings.cost_titles.form.add_button')}
           </Button>
         </form>
@@ -209,6 +210,7 @@ function CostTitlesForm() {
 function EmployeeForm() {
   const { t } = useI18n();
   const { toast } = useToast();
+  const { db } = useAppContext();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const form = useForm<z.infer<typeof employeeSchema>>({
     resolver: zodResolver(employeeSchema),
@@ -216,17 +218,19 @@ function EmployeeForm() {
   });
 
   const fetchEmployees = async () => {
-    const allEmployees = await getAllEmployees();
+    if (!db) return;
+    const allEmployees = await db.getAllEmployees();
     setEmployees(allEmployees);
   };
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+  }, [db]);
 
   const onSubmit = async (data: z.infer<typeof employeeSchema>) => {
+    if (!db) return;
     try {
-      await addEmployee(data);
+      await db.addEmployee(data);
       toast({ title: t('settings.employees.toasts.success_add.title'), description: t('settings.employees.toasts.success_add.description') });
       form.reset();
       fetchEmployees();
@@ -240,8 +244,9 @@ function EmployeeForm() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!db) return;
     try {
-      await deleteEmployee(id);
+      await db.deleteEmployee(id);
       toast({ title: t('settings.employees.toasts.success_delete.title'), description: t('settings.employees.toasts.success_delete.description') });
       fetchEmployees();
     } catch (error) {
@@ -299,7 +304,7 @@ function EmployeeForm() {
                     )}
                 />
            </div>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
+          <Button type="submit" disabled={form.formState.isSubmitting || !db}>
             <PlusCircle className="mr-2" /> {t('settings.employees.add_form.add_button')}
           </Button>
         </form>
@@ -336,6 +341,42 @@ function EmployeeForm() {
   );
 }
 
+function StorageSettingsForm() {
+    const { t } = useI18n();
+    const { toast } = useToast();
+    const { storageType, changeStorageType } = useAppContext();
+
+    const handleStorageChange = (value: StorageType) => {
+        changeStorageType(value);
+        toast({
+            title: t('settings.data_storage.toasts.success.title'),
+            description: t('settings.data_storage.toasts.success.description', {
+                storage: value === 'cloud' ? t('settings.data_storage.form.cloud') : t('settings.data_storage.form.local')
+            }),
+        });
+        // Note: You might want to reload the app or force a data re-fetch here
+        window.location.reload();
+    }
+
+    return (
+        <div className="space-y-4">
+            <FormLabel>{t('settings.data_storage.form.label')}</FormLabel>
+            <Select value={storageType} onValueChange={handleStorageChange}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder={t('settings.data_storage.form.placeholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="local">{t('settings.data_storage.form.local')}</SelectItem>
+                    <SelectItem value="cloud">{t('settings.data_storage.form.cloud')}</SelectItem>
+                </SelectContent>
+            </Select>
+            <FormDescription>
+                {t('settings.data_storage.form.description')}
+            </FormDescription>
+        </div>
+    );
+}
+
 
 export default function SettingsPage() {
   const { t } = useI18n();
@@ -343,11 +384,25 @@ export default function SettingsPage() {
     <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">{t('settings.title')}</h1>
       <Tabs defaultValue="exchange-rates">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="data-storage">{t('settings.data_storage.tab')}</TabsTrigger>
           <TabsTrigger value="exchange-rates">{t('settings.exchange_rates.tab')}</TabsTrigger>
           <TabsTrigger value="cost-titles">{t('settings.cost_titles.tab')}</TabsTrigger>
           <TabsTrigger value="employees">{t('settings.employees.tab')}</TabsTrigger>
         </TabsList>
+         <TabsContent value="data-storage">
+            <Card>
+                <CardHeader>
+                <CardTitle>{t('settings.data_storage.title')}</CardTitle>
+                <CardDescription>
+                    {t('settings.data_storage.description')}
+                </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <StorageSettingsForm />
+                </CardContent>
+            </Card>
+        </TabsContent>
         <TabsContent value="exchange-rates">
           <Card>
             <CardHeader>

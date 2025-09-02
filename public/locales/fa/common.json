@@ -1,0 +1,319 @@
+{
+    "app_name": "ایزی استاک",
+    "common": {
+        "save_changes": "ذخیره تغییرات",
+        "cancel": "لغو",
+        "delete": "حذف",
+        "are_you_sure": "آیا مطمئن هستید؟"
+    },
+    "sidebar": {
+        "inventory": "موجودی",
+        "add_product": "افزودن محصول",
+        "record_sale": "ثبت فروش",
+        "sales_history": "تاریخچه فروش",
+        "customers": "مشتریان",
+        "expenses": "مخارج",
+        "reports": "گزارش‌ها",
+        "settings": "تنظیمات"
+    },
+    "inventory": {
+        "title": "موجودی کالا",
+        "export_csv": "خروجی CSV",
+        "add_product": "افزودن محصول",
+        "search_placeholder": "جستجوی محصول با نام یا بارکد...",
+        "product_card": {
+            "barcode": "بارکد",
+            "selling_price": "قیمت فروش",
+            "total_cost": "هزینه تمام‌شده",
+            "profit_margin": "حاشیه سود",
+            "stock": "موجودی",
+            "low_stock": "موجودی کم",
+            "in_stock": "موجود"
+        },
+        "edit_product": {
+            "title": "ویرایش محصول",
+            "form": {
+                "product_name": "نام محصول",
+                "quantity": "تعداد",
+                "low_stock_threshold": "آستانه هشدار موجودی",
+                "total_cost": "هزینه تمام‌شده",
+                "profit_margin": "حاشیه سود (%)",
+                "final_selling_price": "قیمت فروش نهایی"
+            },
+            "toasts": {
+                "success": {
+                    "title": "محصول ویرایش شد",
+                    "description": "{name} با موفقیت به‌روزرسانی شد."
+                },
+                "error": {
+                    "title": "خطا",
+                    "description": "ویرایش محصول ناموفق بود."
+                }
+            }
+        },
+        "delete_dialog": {
+            "description": "این عملیات غیرقابل بازگشت است. محصول '{name}' برای همیشه حذف خواهد شد."
+        },
+        "no_products": {
+            "title": "محصولی یافت نشد",
+            "description": "برای شروع، اولین محصول خود را اضافه کنید.",
+            "add_product_button": "افزودن محصول"
+        },
+        "toasts": {
+            "load_error": {
+                "title": "خطا",
+                "description": "بارگذاری محصولات از پایگاه داده ناموفق بود."
+            },
+            "delete_success": {
+                "title": "محصول حذف شد",
+                "description": "محصول با موفقیت حذف شد."
+            },
+            "delete_error": {
+                "title": "خطا",
+                "description": "حذف محصول ناموفق بود."
+            }
+        }
+    },
+    "add_product": {
+        "title": "افزودن محصول جدید",
+        "description": "جزئیات محصول و هزینه‌های مربوط به آن را وارد کنید.",
+        "form": {
+            "barcode": {
+                "label": "بارکد (شناسه)",
+                "placeholder": "بارکد را اسکن یا وارد کنید"
+            },
+            "product_name": {
+                "label": "نام محصول",
+                "placeholder": "مثال: سیب ارگانیک"
+            },
+            "initial_quantity": {
+                "label": "تعداد اولیه"
+            },
+            "low_stock_threshold": {
+                "label": "آستانه موجودی کم"
+            },
+            "add_button": "افزودن محصول",
+            "adding_button": "در حال افزودن..."
+        },
+        "costs_section": {
+            "title": "هزینه‌های محصول",
+            "cost_title": {
+                "label": "عنوان هزینه",
+                "placeholder": "یک عنوان انتخاب کنید"
+            },
+            "amount": {
+                "label": "مبلغ"
+            },
+            "currency": {
+                "label": "ارز",
+                "placeholder": "ارز را انتخاب کنید"
+            },
+            "add_cost_button": "افزودن هزینه",
+            "no_cost_titles_message_1": "هنوز هیچ عنوان هزینه‌ای تعریف نکرده‌اید. لطفا در",
+            "no_cost_titles_message_2": "صفحه تنظیمات"
+        },
+        "pricing_section": {
+            "title": "قیمت‌گذاری",
+            "profit_margin": {
+                "label": "حاشیه سود (%)"
+            },
+            "calculated_price": {
+                "label": "قیمت فروش محاسبه‌شده",
+                "description": "این قیمت بر اساس مجموع هزینه‌ها و حاشیه سود محاسبه می‌شود."
+            }
+        },
+        "toasts": {
+            "product_exists": {
+                "title": "محصول موجود است",
+                "description": "محصولی با بارکد {barcode} از قبل موجود است."
+            },
+            "product_added": {
+                "title": "محصول اضافه شد",
+                "description": "'{name}' به موجودی شما اضافه شد."
+            },
+            "error": {
+                "title": "خطا",
+                "description": "افزودن محصول ناموفق بود. لطفا دوباره تلاش کنید."
+            }
+        }
+    },
+    "settings": {
+        "title": "تنظیمات",
+        "data_storage": {
+            "tab": "ذخیره‌سازی داده",
+            "title": "محل ذخیره‌سازی داده‌ها",
+            "description": "انتخاب کنید داده‌های برنامه به صورت محلی در مرورگر شما ذخیره شوند یا در فضای ابری (Firestore) برای دسترسی از دستگاه‌های مختلف.",
+            "form": {
+                "label": "محل ذخیره‌سازی",
+                "placeholder": "انتخاب کنید",
+                "local": "محلی (مرورگر)",
+                "cloud": "ابری (Firestore)",
+                "description": "تغییر این گزینه نیازمند بارگذاری مجدد برنامه است."
+            },
+            "toasts": {
+                "success": {
+                    "title": "تغییرات ذخیره شد",
+                    "description": "محل ذخیره‌سازی به {storage} تغییر یافت."
+                }
+            }
+        },
+        "exchange_rates": {
+            "tab": "نرخ ارز",
+            "title": "نرخ‌های تبدیل ارز",
+            "description": "نرخ تبدیل ارزهای مختلف به تومان را برای محاسبه دقیق هزینه تمام شده وارد کنید.",
+            "form": {
+                "label": "نرخ {currency} به تومان",
+                "save_button": "ذخیره نرخ‌ها"
+            },
+            "toasts": {
+                "success": {
+                    "title": "موفق",
+                    "description": "نرخ‌های ارز با موفقیت به‌روزرسانی شدند."
+                },
+                "error": {
+                    "title": "خطا",
+                    "description": "ذخیره نرخ ارز ناموفق بود."
+                }
+            }
+        },
+        "cost_titles": {
+            "tab": "عناوین هزینه",
+            "title": "عناوین هزینه‌های خرید",
+            "description": "عناوین هزینه‌های متداول هنگام خرید کالا (مانند حمل و نقل، گمرک و...) را تعریف کنید.",
+            "form": {
+                "new_title_label": "عنوان هزینه جدید",
+                "new_title_placeholder": "مثال: هزینه حمل",
+                "add_button": "افزودن"
+            },
+            "existing_titles_label": "عناوین موجود",
+            "no_titles_message": "هیچ عنوانی تعریف نشده است.",
+            "toasts": {
+                "success_add": {
+                    "title": "موفق",
+                    "description": "عنوان هزینه جدید اضافه شد."
+                },
+                "error_add": {
+                    "title": "خطا",
+                    "description": "افزودن عنوان هزینه ناموفق بود."
+                },
+                "success_delete": {
+                    "title": "موفق",
+                    "description": "عنوان هزینه حذف شد."
+                },
+                "error_delete": {
+                    "title": "خطا",
+                    "description": "حذف عنوان هزینه ناموفق بود."
+                }
+            }
+        },
+        "employees": {
+            "tab": "کارمندان",
+            "title": "مدیریت کارمندان",
+            "description": "کارمندان و اطلاعات مربوط به حقوق آن‌ها را در این بخش مدیریت کنید.",
+            "add_form": {
+                "title": "افزودن کارمند جدید",
+                "name_label": "نام و نام خانوادگی",
+                "name_placeholder": "مثال: علی رضایی",
+                "position_label": "سمت",
+                "position_placeholder": "مثال: فروشنده",
+                "salary_label": "حقوق ماهانه (تومان)",
+                "salary_placeholder": "10,000,000",
+                "add_button": "افزودن کارمند"
+            },
+            "list": {
+                "title": "لیست کارمندان",
+                "no_employees": "هنوز کارمندی اضافه نشده است."
+            },
+             "toasts": {
+                "success_add": {
+                    "title": "موفق",
+                    "description": "کارمند جدید اضافه شد و هزینه حقوق ماهانه برای او به صورت خودکار ایجاد گردید."
+                },
+                "error_add": {
+                    "title": "خطا",
+                    "description": "افزودن کارمند ناموفق بود."
+                },
+                "success_delete": {
+                    "title": "موفق",
+                    "description": "کارمند و هزینه حقوق مربوطه حذف شد."
+                },
+                "error_delete": {
+                    "title": "خطا",
+                    "description": "حذف کارمند ناموفق بود."
+                }
+            }
+        }
+    },
+    "record_sale": {
+        "title": "ثبت فروش جدید",
+        "description": "برای ثبت فروش، بارکد کالا را اسکن کرده یا آن را به صورت دستی به سبد خرید اضافه کنید.",
+        "barcode_placeholder": "اسکن یا وارد کردن بارکد...",
+        "cart_table": {
+            "product": "محصول",
+            "quantity": "تعداد",
+            "price": "قیمت واحد",
+            "total": "جمع کل",
+            "actions": "عملیات",
+            "empty": "سبد خرید خالی است"
+        },
+        "summary": {
+            "title": "خلاصه فروش",
+            "items": "تعداد اقلام",
+            "total": "جمع کل",
+            "complete_sale_button": "تکمیل فروش"
+        },
+        "toasts": {
+            "out_of_stock": {
+                "title": "موجودی تمام شد",
+                "description": "موجودی '{name}' به اتمام رسیده است."
+            },
+            "stock_limit_reached": {
+                "title": "تعداد بیش از موجودی",
+                "description": "امکان افزودن تعداد بیشتری از '{name}' وجود ندارد."
+            },
+            "product_not_found": {
+                "title": "محصول یافت نشد",
+                "description": "محصولی با بارکد {barcode} یافت نشد."
+            },
+            "db_error": {
+                "title": "خطای پایگاه داده",
+                "description": "امکان بازیابی اطلاعات محصول وجود نداشت."
+            },
+            "empty_cart": {
+                "title": "سبد خرید خالی",
+                "description": "برای تکمیل فروش، کالاها را به سبد خرید اضافه کنید."
+            },
+            "sale_complete": {
+                "title": "فروش تکمیل شد!",
+                "description": "فروش به مبلغ {total} تومان با موفقیت ثبت شد."
+            },
+            "error": {
+                "title": "خطا",
+                "description": "تکمیل فروش ناموفق بود. موجودی به‌روزرسانی نشد."
+            }
+        }
+    },
+    "reports": {
+        "title": "گزارش‌ها",
+        "generate_button": "تولید گزارش هوشمند",
+        "generating_button": "در حال تولید...",
+        "card": {
+            "title": "توصیه‌های هوشمند",
+            "description": "بر اساس داده‌های فروش و موجودی، توصیه‌هایی برای مدیریت بهتر دریافت کنید.",
+            "empty": {
+                "title": "آماده برای تحلیل",
+                "description": "برای دریافت توصیه‌های هوشمند بر اساس داده‌های خود، دکمه تولید گزارش را فشار دهید."
+            }
+        },
+        "toasts": {
+            "not_enough_data": {
+                "title": "داده کافی نیست",
+                "description": "برای تولید گزارش نیاز به حداقل یک محصول و یک فروش ثبت شده است."
+            },
+            "error": {
+                "title": "خطا در تولید گزارش",
+                "description": "متاسفانه تولید گزارش هوشمند با خطا مواجه شد."
+            }
+        }
+    }
+}

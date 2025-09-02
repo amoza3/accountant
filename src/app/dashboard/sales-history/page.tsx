@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAllSales, getPaymentsByIds, getAttachmentsBySourceId } from '@/lib/db';
 import type { Sale, PaymentMethod, Payment, Attachment } from '@/lib/types';
 import {
   Table,
@@ -26,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Paperclip } from 'lucide-react';
+import { useAppContext } from '@/components/app-provider';
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
     CASH: 'نقد',
@@ -40,16 +40,18 @@ type SaleWithDetails = Sale & {
 export default function SalesHistoryPage() {
   const [salesWithDetails, setSalesWithDetails] = useState<SaleWithDetails[]>([]);
   const { toast } = useToast();
+  const { db } = useAppContext();
 
   useEffect(() => {
+    if (!db) return;
     async function fetchSales() {
       try {
-        const allSales = await getAllSales();
+        const allSales = await db.getAllSales();
         const salesDetails: SaleWithDetails[] = await Promise.all(
             allSales.map(async (sale) => {
-                const payments = await getPaymentsByIds(sale.paymentIds || []);
+                const payments = await db.getPaymentsByIds(sale.paymentIds || []);
                 const paymentsWithAttachments = await Promise.all(payments.map(async (payment) => {
-                    const attachments = await getAttachmentsBySourceId(payment.id);
+                    const attachments = await db.getAttachmentsBySourceId(payment.id);
                     return { ...payment, attachments };
                 }));
                 return { ...sale, payments: paymentsWithAttachments };
@@ -65,7 +67,7 @@ export default function SalesHistoryPage() {
       }
     }
     fetchSales();
-  }, [toast]);
+  }, [toast, db]);
 
   const totalPaid = (sale: SaleWithDetails) => sale.payments.reduce((acc, p) => acc + p.amount, 0);
 

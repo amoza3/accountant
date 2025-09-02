@@ -5,12 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PlusCircle, Trash2, Pencil, User } from 'lucide-react';
-import {
-  getAllCustomers,
-  addCustomer,
-  updateCustomer,
-  deleteCustomer,
-} from '@/lib/db';
 import type { Customer } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,6 +47,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useAppContext } from '@/components/app-provider';
 
 const customerSchema = z.object({
   name: z.string().min(1, 'نام مشتری الزامی است'),
@@ -68,6 +63,7 @@ function CustomerForm({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { db } = useAppContext();
   const form = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
     defaultValues: customer || {
@@ -78,12 +74,13 @@ function CustomerForm({
   });
 
   const handleSubmit = async (data: z.infer<typeof customerSchema>) => {
+    if (!db) return;
     try {
       if (customer) {
-        await updateCustomer({ ...customer, ...data });
+        await db.updateCustomer({ ...customer, ...data });
         toast({ title: 'موفق', description: 'اطلاعات مشتری به‌روزرسانی شد.' });
       } else {
-        await addCustomer({ id: Date.now().toString(), ...data });
+        await db.addCustomer({ id: Date.now().toString(), ...data });
         toast({ title: 'موفق', description: 'مشتری جدید اضافه شد.' });
       }
       onSuccess();
@@ -224,10 +221,12 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { db } = useAppContext();
 
   const fetchCustomers = async () => {
+    if (!db) return;
     try {
-      const allCustomers = await getAllCustomers();
+      const allCustomers = await db.getAllCustomers();
       setCustomers(allCustomers.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
       toast({
@@ -240,11 +239,12 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [db]);
 
   const handleDelete = async (id: string) => {
+    if (!db) return;
     try {
-      await deleteCustomer(id);
+      await db.deleteCustomer(id);
       toast({
         title: 'مشتری حذف شد',
         description: 'مشتری با موفقیت حذف شد.',
