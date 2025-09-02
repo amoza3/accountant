@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
-import { getAllSales, getAllExpenses } from '@/lib/db';
-import type { Sale, Expense } from '@/lib/types';
+import { getAllSales, getAllExpenses, getPaymentsByIds } from '@/lib/db';
+import type { Sale, Expense, Payment } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,6 +24,7 @@ type ChartData = {
 export default function ReportsPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('this_month');
   const { toast } = useToast();
@@ -35,6 +36,9 @@ export default function ReportsPage() {
         const [allSales, allExpenses] = await Promise.all([getAllSales(), getAllExpenses()]);
         setSales(allSales);
         setExpenses(allExpenses);
+        const paymentIds = allSales.flatMap(s => s.paymentIds);
+        const allPayments = await getPaymentsByIds(paymentIds);
+        setPayments(allPayments);
       } catch (error) {
         toast({
           variant: 'destructive',
@@ -79,8 +83,7 @@ export default function ReportsPage() {
       case 'all':
       default:
         isAll = true;
-        // Dummy dates, won't be used
-        startDate = new Date(); 
+        startDate = new Date(0); 
         endDate = new Date();
         break;
     }
@@ -111,11 +114,8 @@ export default function ReportsPage() {
 
     filteredSales.forEach(sale => {
       const dateKey = format(new Date(sale.date), dateFormat);
-      const saleGrossProfit = sale.items.reduce((acc, item) => {
-          const itemRevenue = item.price * item.quantity;
-          const itemCost = item.totalCost || 0; // Fallback to 0 if totalCost is not available
-          return acc + (itemRevenue - itemCost);
-      }, 0);
+      const saleItemsCost = sale.items.reduce((acc, item) => acc + (item.totalCost || 0), 0);
+      const saleGrossProfit = sale.total - saleItemsCost;
       
       const current = dataMap.get(dateKey) || { فروش: 0, 'سود ناخالص': 0, مخارج: 0 };
       current.فروش += sale.total;
@@ -130,7 +130,6 @@ export default function ReportsPage() {
       dataMap.set(dateKey, current);
     });
 
-
     return Array.from(dataMap.entries())
         .map(([name, values]) => ({ 
             name,
@@ -141,24 +140,26 @@ export default function ReportsPage() {
 
   }, [filteredSales, filteredExpenses, timeRange, sales, expenses]);
 
-  const { totalSales, totalGrossProfit, totalExpenses, totalNetProfit } = useMemo(() => {
+  const { totalSales, totalGrossProfit, totalExpenses, totalNetProfit, totalReceivables } = useMemo(() => {
     const grossProfit = filteredSales.reduce((total, sale) => {
-        const saleProfit = sale.items.reduce((acc, item) => {
-            const itemRevenue = item.price * item.quantity;
-            const itemCost = item.totalCost || 0; // Fallback to 0
-            return acc + (itemRevenue - itemCost);
-        }, 0);
-        return total + saleProfit;
+        const saleItemsCost = sale.items.reduce((acc, item) => acc + (item.totalCost || 0), 0);
+        return total + (sale.total - saleItemsCost);
     }, 0);
     const expensesSum = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const totalPaid = filteredSales.reduce((total, sale) => {
+        const salePayments = payments.filter(p => sale.paymentIds.includes(p.id));
+        return total + salePayments.reduce((sum, p) => sum + p.amount, 0);
+    }, 0);
+    const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
 
     return {
-        totalSales: filteredSales.reduce((sum, sale) => sum + sale.total, 0),
+        totalSales: totalRevenue,
         totalGrossProfit: grossProfit,
         totalExpenses: expensesSum,
         totalNetProfit: grossProfit - expensesSum,
+        totalReceivables: totalRevenue - totalPaid,
     };
-  }, [filteredSales, filteredExpenses]);
+  }, [filteredSales, filteredExpenses, payments]);
   
   const renderChart = (data: ChartData[], title: string) => (
      <Card>
@@ -211,16 +212,17 @@ export default function ReportsPage() {
         </div>
       </div>
         {isLoading ? (
-             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-96 w-full lg:col-span-4" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-96 w-full lg:col-span-5" />
             </div>
         ) : sales.length > 0 || expenses.length > 0 ? (
         <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
                     <CardHeader>
                         <CardTitle>مجموع فروش</CardTitle>
@@ -262,6 +264,17 @@ export default function ReportsPage() {
                     <CardContent>
                          <p className="text-3xl font-bold text-green-600">
                             {totalNetProfit.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
+                        </p>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>مجموع مطالبات</CardTitle>
+                        <CardDescription>مبالغ پرداخت نشده</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <p className="text-3xl font-bold text-orange-500">
+                            {totalReceivables.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
                         </p>
                     </CardContent>
                 </Card>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle, UserPlus, Search } from 'lucide-react';
+import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle, UserPlus, Search, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -39,14 +39,36 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { getProductById, addSale, getAllCustomers, getAllProducts } from '@/lib/db';
-import type { SaleItem, Customer, PaymentMethod, Product } from '@/lib/types';
+import { getProductById, addSale, getAllCustomers, getAllProducts, addPayment } from '@/lib/db';
+import type { SaleItem, Customer, PaymentMethod, Product, Payment } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CURRENCY_SYMBOLS } from '@/lib/utils';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from '@/components/ui/form';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+
+
+const paymentFormSchema = z.object({
+  amount: z.coerce.number().min(1, 'مبلغ باید بزرگتر از صفر باشد'),
+  method: z.enum(['CASH', 'CARD', 'ONLINE']),
+  receiptNumber: z.string().optional(),
+  receiptImage: z.string().optional(),
+});
+
 
 export default function RecordSalePage() {
   const [cart, setCart] = useState<Omit<SaleItem, 'totalCost'>[]>([]);
@@ -62,13 +84,23 @@ export default function RecordSalePage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CARD');
-  
+  const [payments, setPayments] = useState<Omit<Payment, 'id' | 'attachmentIds'>[]>([]);
+
   const paymentMethodLabels: Record<PaymentMethod, string> = {
     CASH: 'نقد',
     CARD: 'کارتخوان',
     ONLINE: 'آنلاین',
   };
+  
+  const paymentForm = useForm<z.infer<typeof paymentFormSchema>>({
+    resolver: zodResolver(paymentFormSchema),
+    defaultValues: {
+        amount: 0,
+        method: 'CARD',
+        receiptNumber: '',
+        receiptImage: '',
+    },
+  });
 
   useEffect(() => {
     barcodeRef.current?.focus();
@@ -82,6 +114,15 @@ export default function RecordSalePage() {
     }
     fetchData();
   }, []);
+
+  const total = useMemo(() => cart.reduce((acc, item) => acc + item.price * item.quantity, 0), [cart]);
+  const totalPaid = useMemo(() => payments.reduce((acc, p) => acc + p.amount, 0), [payments]);
+  const remainingAmount = useMemo(() => total - totalPaid, [total, totalPaid]);
+
+   useEffect(() => {
+    paymentForm.setValue('amount', remainingAmount > 0 ? remainingAmount : 0);
+  }, [remainingAmount, paymentForm]);
+
 
   const handleAddProductToCart = useCallback((product: Product) => {
      if (product.quantity <= 0) {
@@ -166,8 +207,16 @@ export default function RecordSalePage() {
 
     setCart(cart.map(item => item.productId === productId ? { ...item, quantity: newQuantity } : item));
   };
-
-  const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  
+  const handleAddPayment = (data: z.infer<typeof paymentFormSchema>) => {
+      setPayments([...payments, { ...data, attachments: [] }]);
+      paymentForm.reset({
+        amount: remainingAmount - data.amount > 0 ? remainingAmount - data.amount : 0,
+        method: 'CARD',
+        receiptNumber: '',
+        receiptImage: '',
+      });
+  }
 
   const completeSale = async () => {
     if (cart.length === 0) {
@@ -184,26 +233,30 @@ export default function RecordSalePage() {
         if (customerSearch && !selectedCustomer) {
             newCustomerNameToAdd = customerSearch;
         }
+        
+        const paymentIds = await Promise.all(
+            payments.map(p => addPayment({amount: p.amount, method: p.method, date: new Date().toISOString()}, []))
+        );
 
-      await addSale({
-        id: Date.now(),
-        items: cart,
-        total,
-        date: new Date().toISOString(),
-        customerId: selectedCustomer?.id,
-        customerName: selectedCustomer?.name,
-        paymentMethod: paymentMethod,
-      }, newCustomerNameToAdd);
+        await addSale({
+            items: cart,
+            total,
+            date: new Date().toISOString(),
+            customerId: selectedCustomer?.id,
+            customerName: selectedCustomer?.name,
+            paymentIds: paymentIds,
+        }, newCustomerNameToAdd);
 
-      toast({
-        title: 'فروش تکمیل شد!',
-        description: `فروش به مبلغ ${total.toLocaleString('fa-IR')} تومان با موفقیت ثبت شد.`,
-        className: 'bg-accent text-accent-foreground border-accent',
-      });
-      setCart([]);
-      setSelectedCustomer(null);
-      setCustomerSearch('');
-      router.push(`/dashboard`);
+        toast({
+            title: 'فروش تکمیل شد!',
+            description: `فروش به مبلغ ${total.toLocaleString('fa-IR')} تومان با موفقیت ثبت شد.`,
+            className: 'bg-accent text-accent-foreground border-accent',
+        });
+        setCart([]);
+        setSelectedCustomer(null);
+        setCustomerSearch('');
+        setPayments([]);
+        router.push(`/dashboard`);
     } catch (error) {
       console.error(error);
       toast({
@@ -288,6 +341,69 @@ export default function RecordSalePage() {
                     <CardTitle>خلاصه و پرداخت</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="flex justify-between items-baseline text-2xl font-bold">
+                            <span>جمع کل:</span>
+                            <Badge className="text-2xl" variant="secondary">{total.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</Badge>
+                        </div>
+                         <div className="flex justify-between items-baseline text-lg">
+                            <span className="text-green-600">پرداخت شده:</span>
+                            <span className="font-semibold text-green-600">{totalPaid.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
+                        </div>
+                         <div className="flex justify-between items-baseline text-lg">
+                            <span className="text-red-600">باقیمانده:</span>
+                            <span className="font-semibold text-red-600">{remainingAmount.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
+                        </div>
+                    </div>
+                    <Separator/>
+                    <div>
+                        <h4 className="font-medium mb-2">ثبت پرداخت جدید</h4>
+                        <Form {...paymentForm}>
+                            <form onSubmit={paymentForm.handleSubmit(handleAddPayment)} className="space-y-4 p-4 border rounded-md">
+                                <FormField control={paymentForm.control} name="amount" render={({field}) => (
+                                    <FormItem>
+                                        <FormLabel>مبلغ پرداخت</FormLabel>
+                                        <FormControl><Input type="number" {...field} /></FormControl>
+                                    </FormItem>
+                                )}/>
+                                <FormField control={paymentForm.control} name="method" render={({field}) => (
+                                     <FormItem>
+                                        <FormLabel>روش پرداخت</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {Object.entries(paymentMethodLabels).map(([method, label]) => (
+                                                    <SelectItem key={method} value={method}>{label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                )}/>
+                                <Button type="submit" size="sm">افزودن پرداخت</Button>
+                            </form>
+                        </Form>
+                    </div>
+
+                     {payments.length > 0 && (
+                        <div>
+                             <h4 className="font-medium mb-2">پرداخت‌های ثبت‌شده</h4>
+                            <div className="space-y-2">
+                                {payments.map((p, i) => (
+                                    <div key={i} className="flex justify-between items-center p-2 border rounded-md bg-muted">
+                                        <span>{paymentMethodLabels[p.method]}: {p.amount.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
+                                        <Button variant="ghost" size="icon" onClick={() => setPayments(payments.filter((_, idx) => idx !== i))}>
+                                            <Trash2 className="w-4 h-4 text-destructive"/>
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    <Separator/>
+
                     <div>
                         <Label>مشتری</Label>
                         <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
@@ -334,30 +450,6 @@ export default function RecordSalePage() {
                                 </Command>
                             </PopoverContent>
                         </Popover>
-                    </div>
-                    
-                    <div>
-                        <Label>روش پرداخت</Label>
-                        <Select value={paymentMethod} onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="روش پرداخت را انتخاب کنید" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(paymentMethodLabels).map(([method, label]) => (
-                                    <SelectItem key={method} value={method}>{label}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <Separator/>
-
-                    <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">تعداد اقلام</span>
-                    <span>{cart.reduce((acc, item) => acc + item.quantity, 0)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-2xl font-bold">
-                    <span>جمع کل</span>
-                    <Badge className="text-2xl" variant="secondary">{total.toLocaleString('fa-IR')} تومان</Badge>
                     </div>
                 </CardContent>
                 <CardFooter>

@@ -1,11 +1,12 @@
 export type Currency = 'TOMAN' | 'AED' | 'CNY' | 'USD';
 export type PaymentMethod = 'CASH' | 'CARD' | 'ONLINE';
 export type RecurringExpenseFrequency = 'monthly' | 'yearly';
-export type AttachmentSource = 'sale' | 'expense';
-
+export type AttachmentSource = 'sale' | 'expense' | 'payment';
 
 export interface Attachment {
-  id: string;
+  id: string; // unique id
+  sourceId: string; // id of sale, expense, or payment
+  sourceType: AttachmentSource;
   date: string; // ISO string
   description?: string;
   receiptNumber?: string;
@@ -41,7 +42,7 @@ export interface SaleItem {
   productName: string;
   quantity: number;
   price: number; // Price at the time of sale
-  totalCost: number; // Total cost at the time of sale
+  totalCost: number; // Total cost at the time of sale for the quantity
 }
 
 export interface Payment {
@@ -49,14 +50,14 @@ export interface Payment {
   amount: number;
   method: PaymentMethod;
   date: string; // ISO date string
-  attachments: Attachment[];
+  attachmentIds: string[];
 }
 
 export interface Sale {
   id: number; // Timestamp of the sale
   items: SaleItem[];
   total: number;
-  payments: Payment[];
+  paymentIds: string[];
   date: string;
   customerId?: string;
   customerName?: string;
@@ -85,7 +86,7 @@ export interface Expense {
   title: string;
   amount: number;
   date: string;
-  attachments: Attachment[];
+  attachmentIds: string[];
 }
 
 export interface RecurringExpense {

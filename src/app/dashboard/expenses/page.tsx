@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw, Paperclip } from 'lucide-react';
+import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw, Paperclip, Pencil } from 'lucide-react';
 import {
   getAllExpenses,
   addExpense,
@@ -13,8 +13,12 @@ import {
   addRecurringExpense,
   deleteRecurringExpense,
   applyRecurringExpenses,
+  addAttachment,
+  getAttachmentsBySourceId,
+  deleteAttachment,
+  updateExpense
 } from '@/lib/db';
-import type { Expense, RecurringExpense, RecurringExpenseFrequency } from '@/lib/types';
+import type { Expense, RecurringExpense, RecurringExpenseFrequency, Attachment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -49,13 +53,19 @@ import { CURRENCY_SYMBOLS } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+
+const attachmentSchema = z.object({
+  description: z.string().optional(),
+  receiptNumber: z.string().optional(),
+  receiptImage: z.string().optional(), // Base64
+});
 
 const expenseSchema = z.object({
   title: z.string().min(1, 'عنوان هزینه الزامی است'),
   amount: z.coerce.number().min(1, 'مبلغ باید بزرگتر از صفر باشد'),
-  receiptNumber: z.string().optional(),
-  receiptImage: z.string().optional(),
+  attachments: z.array(attachmentSchema).optional(),
 });
 
 const recurringExpenseSchema = z.object({
@@ -65,45 +75,141 @@ const recurringExpenseSchema = z.object({
   startDate: z.string().min(1, 'تاریخ شروع الزامی است'),
 });
 
-function OneTimeExpenseForm({ onExpenseAdded }: { onExpenseAdded: () => void }) {
+
+function AttachmentForm({ onAddAttachment, attachmentToEdit, onUpdateAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void, attachmentToEdit?: Partial<Attachment>, onUpdateAttachment?: (data: Partial<Attachment>) => void }) {
+    const form = useForm<z.infer<typeof attachmentSchema>>({
+        resolver: zodResolver(attachmentSchema),
+        defaultValues: attachmentToEdit || { description: '', receiptNumber: '', receiptImage: '' },
+    });
+    
+    const [preview, setPreview] = useState(attachmentToEdit?.receiptImage || '');
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreview(reader.result as string);
+                form.setValue('receiptImage', reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleSubmit = (data: z.infer<typeof attachmentSchema>) => {
+        if(attachmentToEdit && onUpdateAttachment){
+            onUpdateAttachment({ ...attachmentToEdit, ...data });
+        } else {
+            onAddAttachment(data);
+        }
+        form.reset();
+        setPreview('');
+    }
+
+    return (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 p-4 border rounded-md">
+                 <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>توضیحات (اختیاری)</FormLabel>
+                        <FormControl>
+                            <Textarea placeholder="جزئیات بیشتر..." {...field} />
+                        </FormControl>
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="receiptNumber"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>شماره رسید/سند (اختیاری)</FormLabel>
+                        <FormControl>
+                            <Input placeholder="123456" {...field} />
+                        </FormControl>
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="receiptImage"
+                    render={() => (
+                        <FormItem>
+                        <FormLabel>تصویر رسید (اختیاری)</FormLabel>
+                        <FormControl>
+                            <Input type="file" accept="image/*" onChange={handleFileChange} className="pt-2"/>
+                        </FormControl>
+                        </FormItem>
+                    )}
+                    />
+                {preview && (
+                    <div className="relative w-32 h-32">
+                        <img src={preview} alt="پیش‌نمایش رسید" className="rounded-md object-cover w-full h-full" />
+                        <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => { form.setValue('receiptImage', ''); setPreview(''); }}>
+                            <Trash2 className="h-4 w-4"/>
+                        </Button>
+                    </div>
+                )}
+                 <Button type="submit">
+                    {attachmentToEdit ? 'بروزرسانی سند' : 'افزودن سند'}
+                </Button>
+            </form>
+        </Form>
+    );
+}
+
+function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onExpenseAdded: () => void, expenseToEdit?: Expense & { attachments?: Attachment[]}, onExpenseUpdated?: () => void }) {
   const { toast } = useToast();
+  const [attachments, setAttachments] = useState<Partial<Attachment>[]>(expenseToEdit?.attachments || []);
+  const [deletedAttachmentIds, setDeletedAttachmentIds] = useState<string[]>([]);
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: { title: '', amount: 0, receiptNumber: '', receiptImage: '' },
+    defaultValues: expenseToEdit || { title: '', amount: 0 },
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        form.setValue('receiptImage', reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const handleAddAttachment = (data: z.infer<typeof attachmentSchema>) => {
+      setAttachments([...attachments, { ...data, id: Date.now().toString()}]);
+  }
   
+  const handleRemoveAttachment = (id: string) => {
+      setAttachments(attachments.filter(att => att.id !== id));
+      if(!id.startsWith('new-')) { // Only track deletions of existing attachments
+          setDeletedAttachmentIds([...deletedAttachmentIds, id]);
+      }
+  }
+
   const onSubmit = async (data: z.infer<typeof expenseSchema>) => {
     try {
-      const newExpense: Expense = {
-        id: Date.now().toString(),
-        date: new Date().toISOString(),
-        ...data,
-      };
-      await addExpense(newExpense);
-      toast({ title: 'موفق', description: 'هزینه جدید با موفقیت ثبت شد.' });
-      form.reset();
-      onExpenseAdded();
+        const attachmentData = attachments.map(({id, ...rest}) => rest);
+        if (expenseToEdit && onExpenseUpdated) {
+            const newAttachments = attachmentData.filter(att => !expenseToEdit.attachmentIds.includes((att as Attachment).id)) as Omit<Attachment, 'id'|'sourceId'|'sourceType'>[];
+            await updateExpense({ ...expenseToEdit, ...data}, newAttachments, deletedAttachmentIds);
+            toast({ title: 'موفق', description: 'هزینه با موفقیت بروزرسانی شد.' });
+            onExpenseUpdated();
+        } else {
+            await addExpense({
+                ...data,
+                date: new Date().toISOString(),
+            }, attachmentData);
+            toast({ title: 'موفق', description: 'هزینه جدید با موفقیت ثبت شد.' });
+            form.reset();
+            setAttachments([]);
+            onExpenseAdded();
+        }
     } catch (error) {
-      toast({ variant: 'destructive', title: 'خطا', description: 'ثبت هزینه ناموفق بود.' });
+      console.error(error)
+      toast({ variant: 'destructive', title: 'خطا', description: 'عملیات ناموفق بود.' });
     }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ثبت هزینه لحظه‌ای</CardTitle>
-        <CardDescription>هزینه‌های جاری و غیرتکراری خود را در این قسمت وارد کنید.</CardDescription>
+        <CardTitle>{expenseToEdit ? 'ویرایش هزینه' : 'ثبت هزینه لحظه‌ای'}</CardTitle>
+        <CardDescription>{expenseToEdit ? 'جزئیات هزینه را ویرایش کنید.' : 'هزینه‌های جاری و غیرتکراری خود را در این قسمت وارد کنید.'}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -134,43 +240,35 @@ function OneTimeExpenseForm({ onExpenseAdded }: { onExpenseAdded: () => void }) 
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="receiptNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>شماره رسید/سند (اختیاری)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="123456" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="receiptImage"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>تصویر رسید (اختیاری)</FormLabel>
-                  <FormControl>
-                    <Input type="file" accept="image/*" onChange={handleFileChange} className="pt-2"/>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {form.watch('receiptImage') && (
-                <div className="relative w-32 h-32">
-                    <img src={form.watch('receiptImage')} alt="پیش‌نمایش رسید" className="rounded-md object-cover w-full h-full" />
-                    <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => form.setValue('receiptImage', '')}>
-                        <Trash2 className="h-4 w-4"/>
-                    </Button>
+            
+            <div className="space-y-4">
+                <Label>اسناد پیوست</Label>
+                <div className="space-y-2">
+                    {attachments.map(att => (
+                        <div key={att.id} className="flex items-center justify-between p-2 border rounded-md">
+                            <span>{att.receiptNumber || att.description || 'سند بدون عنوان'}</span>
+                             <Button type="button" size="icon" variant="ghost" onClick={() => handleRemoveAttachment(att.id!)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                        </div>
+                    ))}
                 </div>
-            )}
+                 <Dialog>
+                    <DialogTrigger asChild>
+                        <Button type="button" variant="outline"><PlusCircle className="mr-2 h-4 w-4" />افزودن سند</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>افزودن سند جدید</DialogTitle>
+                        </DialogHeader>
+                        <AttachmentForm onAddAttachment={handleAddAttachment} />
+                    </DialogContent>
+                </Dialog>
+            </div>
+
             <Button type="submit" className="w-full">
               <PlusCircle className="mr-2 h-4 w-4" />
-              ثبت هزینه
+              {expenseToEdit ? 'ذخیره تغییرات' : 'ثبت هزینه'}
             </Button>
           </form>
         </Form>
@@ -209,6 +307,7 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
         toast({ title: 'موفق', description: 'هزینه دوره‌ای جدید تعریف شد.' });
         form.reset({ title: '', amount: 0, startDate: new Date().toISOString().split('T')[0] });
         fetchRecurringExpenses();
+        onRecurringExpenseAdded();
         } catch (error) {
         toast({ variant: 'destructive', title: 'خطا', description: 'تعریف هزینه دوره‌ای ناموفق بود.' });
         }
@@ -219,6 +318,7 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
             await deleteRecurringExpense(id);
             toast({ title: 'موفق', description: 'هزینه دوره‌ای حذف شد.' });
             fetchRecurringExpenses();
+             onRecurringExpenseAdded();
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطا', description: 'حذف هزینه دوره‌ای ناموفق بود.' });
         }
@@ -329,15 +429,101 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
     );
 }
 
+function ExpenseListItem({ expense }: { expense: Expense & { attachments: Attachment[] } }) {
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+    const onUpdateSuccess = () => {
+        // This is a placeholder. The parent component will refetch the data.
+        setIsEditDialogOpen(false);
+    };
+
+    return (
+        <li className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-4">
+                <div className="p-2 rounded-full bg-muted text-muted-foreground">
+                    <Receipt className="h-5 w-5" />
+                </div>
+                <div>
+                    <p className="font-semibold">{expense.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {new Date(expense.date).toLocaleDateString('fa-IR')}
+                    </p>
+                </div>
+            </div>
+            <div className="flex items-center gap-2">
+                {expense.attachments && expense.attachments.length > 0 && (
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="icon"><Paperclip className="h-4 w-4" /></Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>اسناد پیوست: {expense.title}</DialogTitle>
+                            </DialogHeader>
+                            <ul className="space-y-2">
+                                {expense.attachments.map(att => (
+                                    <li key={att.id} className="border p-2 rounded-md">
+                                        <p>{att.description || 'سند'}</p>
+                                        <p className="text-xs text-muted-foreground">{att.receiptNumber}</p>
+                                        {att.receiptImage && <img src={att.receiptImage} alt="رسید" className="mt-2 max-w-full h-auto rounded" />}
+                                    </li>
+                                ))}
+                            </ul>
+                        </DialogContent>
+                    </Dialog>
+                )}
+                <span className="font-bold text-red-600">
+                    {expense.amount.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
+                </span>
+                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="icon">
+                            <Pencil className="h-4 w-4" />
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <ExpenseForm expenseToEdit={expense} onExpenseUpdated={onUpdateSuccess} onExpenseAdded={() => {}} />
+                    </DialogContent>
+                </Dialog>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>آیا مطمئن هستید؟</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                این عملیات غیرقابل بازگشت است. هزینه '{expense.title}' برای همیشه حذف خواهد شد.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>لغو</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => (window as any).handleDeleteExpense(expense.id)}>
+                                حذف
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
+        </li>
+    );
+}
+
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<(Expense & { attachments: Attachment[] })[]>([]);
   const [isProcessingRecurring, setIsProcessingRecurring] = useState(false);
   const { toast } = useToast();
 
   const fetchExpenses = async () => {
     try {
         const allExpenses = await getAllExpenses();
-        setExpenses(allExpenses);
+        const expensesWithAttachments = await Promise.all(allExpenses.map(async (exp) => {
+            const attachments = await getAttachmentsBySourceId(exp.id);
+            return { ...exp, attachments };
+        }));
+        setExpenses(expensesWithAttachments);
     } catch (error) {
          toast({
             variant: 'destructive',
@@ -364,6 +550,7 @@ export default function ExpensesPage() {
         }
         fetchExpenses();
       } catch (error) {
+         console.error(error);
          toast({
             variant: 'destructive',
             title: 'خطا در پردازش',
@@ -376,25 +563,30 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     fetchExpenses();
+    
+    // Make handleDelete global for AlertDialog
+    (window as any).handleDeleteExpense = async (id: string) => {
+      try {
+        await deleteExpense(id);
+        toast({
+          title: 'هزینه حذف شد',
+          description: 'هزینه با موفقیت حذف شد.',
+        });
+        fetchExpenses();
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'خطا',
+          description: 'حذف هزینه ناموفق بود.',
+        });
+      }
+    };
+
+    return () => {
+        delete (window as any).handleDeleteExpense;
+    }
   }, []);
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteExpense(id);
-      toast({
-        title: 'هزینه حذف شد',
-        description: 'هزینه با موفقیت حذف شد.',
-      });
-      fetchExpenses();
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'خطا',
-        description: 'حذف هزینه ناموفق بود.',
-      });
-    }
-  };
-  
   return (
     <div className="grid md:grid-cols-3 gap-8">
        <div className="md:col-span-1">
@@ -404,7 +596,7 @@ export default function ExpensesPage() {
                 <TabsTrigger value="recurring"><Repeat className="w-4 h-4 ml-1" />دوره‌ای</TabsTrigger>
             </TabsList>
             <TabsContent value="one-time">
-                <OneTimeExpenseForm onExpenseAdded={fetchExpenses} />
+                <ExpenseForm onExpenseAdded={fetchExpenses} />
             </TabsContent>
              <TabsContent value="recurring">
                 <RecurringExpenseForm onRecurringExpenseAdded={fetchExpenses} />
@@ -431,59 +623,7 @@ export default function ExpensesPage() {
                 {expenses.length > 0 ? (
                 <ul className="divide-y divide-border">
                     {expenses.map((expense) => (
-                    <li key={expense.id} className="flex items-center justify-between p-4">
-                        <div className="flex items-center gap-4">
-                            <div className="p-2 rounded-full bg-muted text-muted-foreground">
-                                <Receipt className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="font-semibold">{expense.title}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {new Date(expense.date).toLocaleDateString('fa-IR')}
-                                    {expense.receiptNumber && ` - رسید: ${expense.receiptNumber}`}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {expense.receiptImage && (
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="icon"><Paperclip className="h-4 w-4" /></Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>تصویر رسید برای: {expense.title}</DialogTitle>
-                                        </DialogHeader>
-                                        <img src={expense.receiptImage} alt={`رسید برای ${expense.title}`} className="max-w-full h-auto rounded-md" />
-                                    </DialogContent>
-                                </Dialog>
-                            )}
-                           <span className="font-bold text-red-600">
-                             {expense.amount.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
-                           </span>
-                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>آیا مطمئن هستید؟</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    این عملیات غیرقابل بازگشت است. هزینه '{expense.title}' برای همیشه حذف خواهد شد.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>لغو</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(expense.id)}>
-                                    حذف
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
-                    </li>
+                       <ExpenseListItem key={expense.id} expense={expense} />
                     ))}
                 </ul>
                 ) : (

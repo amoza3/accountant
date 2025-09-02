@@ -1,12 +1,12 @@
 'use client';
 
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense, Employee, Attachment, Payment } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, SaleItem, Expense, RecurringExpense, Employee, Attachment, Payment, AttachmentSource } from '@/lib/types';
 import { calculateTotalCostInToman } from '@/lib/utils';
 import { addMonths, addYears, isBefore, startOfDay, isEqual, endOfMonth } from 'date-fns';
 
 
 const DB_NAME = 'EasyStockDB';
-const DB_VERSION = 8; // Incremented version
+const DB_VERSION = 9; // Incremented version
 const PRODUCT_STORE = 'products';
 const SALE_STORE = 'sales';
 const SETTINGS_STORE = 'settings';
@@ -15,6 +15,8 @@ const CUSTOMER_STORE = 'customers';
 const EXPENSE_STORE = 'expenses';
 const RECURRING_EXPENSE_STORE = 'recurringExpenses';
 const EMPLOYEE_STORE = 'employees';
+const ATTACHMENT_STORE = 'attachments';
+const PAYMENT_STORE = 'payments';
 
 
 let db: IDBDatabase;
@@ -44,10 +46,6 @@ export const openDB = (): Promise<IDBDatabase> => {
       }
       if (!db.objectStoreNames.contains(SALE_STORE)) {
         db.createObjectStore(SALE_STORE, { keyPath: 'id' });
-      } else {
-        // For schema migration if needed
-        const saleStore = (event.target as IDBOpenDBRequest).transaction?.objectStore(SALE_STORE);
-        // Can add indexes here if needed in future, e.g. for customerId
       }
       if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
           db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
@@ -67,6 +65,13 @@ export const openDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(EMPLOYEE_STORE)) {
         db.createObjectStore(EMPLOYEE_STORE, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(ATTACHMENT_STORE)) {
+        const attachmentStore = db.createObjectStore(ATTACHMENT_STORE, { keyPath: 'id' });
+        attachmentStore.createIndex('sourceId', 'sourceId', { unique: false });
+      }
+       if (!db.objectStoreNames.contains(PAYMENT_STORE)) {
+        db.createObjectStore(PAYMENT_STORE, { keyPath: 'id' });
+      }
     };
   });
 };
@@ -75,6 +80,99 @@ const getStore = (storeName: string, mode: IDBTransactionMode) => {
   const tx = db.transaction(storeName, mode);
   return tx.objectStore(storeName);
 };
+
+// Generic Attachment Operations
+export const addAttachment = (attachment: Omit<Attachment, 'id'>): Promise<string> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(ATTACHMENT_STORE, 'readwrite');
+        const id = Date.now().toString() + Math.random();
+        const request = store.add({ ...attachment, id });
+        request.onsuccess = () => resolve(id);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const getAttachmentsBySourceId = (sourceId: string): Promise<Attachment[]> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(ATTACHMENT_STORE, 'readonly');
+        const index = store.index('sourceId');
+        const request = index.getAll(sourceId);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const deleteAttachment = (id: string): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(ATTACHMENT_STORE, 'readwrite');
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
+
+// Payment Operations
+export const addPayment = async (paymentData: Omit<Payment, 'id' | 'attachmentIds'>, attachments: Omit<Attachment, 'id'| 'sourceId' | 'sourceType'>[]): Promise<string> => {
+    const db = await openDB();
+    const tx = db.transaction([PAYMENT_STORE, ATTACHMENT_STORE], 'readwrite');
+    const paymentStore = tx.objectStore(PAYMENT_STORE);
+    const attachmentStore = tx.objectStore(ATTACHMENT_STORE);
+    
+    const paymentId = Date.now().toString() + Math.random();
+    
+    const attachmentPromises = attachments.map(att => {
+        const attachmentId = Date.now().toString() + Math.random();
+        const newAttachment: Attachment = {
+            ...att,
+            id: attachmentId,
+            sourceId: paymentId,
+            sourceType: 'payment',
+        };
+        attachmentStore.add(newAttachment);
+        return attachmentId;
+    });
+
+    const newPayment: Payment = {
+        ...paymentData,
+        id: paymentId,
+        attachmentIds: attachmentPromises
+    };
+
+    paymentStore.add(newPayment);
+
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve(paymentId);
+        tx.onerror = () => reject(tx.error);
+    });
+};
+
+export const getPaymentsByIds = (ids: string[]): Promise<Payment[]> => {
+    return new Promise(async (resolve, reject) => {
+        if (ids.length === 0) return resolve([]);
+        const db = await openDB();
+        const store = getStore(PAYMENT_STORE, 'readonly');
+        const results: Payment[] = [];
+        let count = 0;
+        ids.forEach(id => {
+            const request = store.get(id);
+            request.onsuccess = () => {
+                if (request.result) {
+                    results.push(request.result);
+                }
+                count++;
+                if (count === ids.length) {
+                    resolve(results);
+                }
+            };
+            request.onerror = () => reject(request.error);
+        });
+    });
+};
+
 
 // Employee Operations
 export const addEmployee = async (employeeData: Omit<Employee, 'id' | 'recurringExpenseId'>): Promise<void> => {
@@ -173,7 +271,6 @@ export const deleteRecurringExpense = (id: string): Promise<void> => {
     });
 };
 
-// Function to check and apply recurring expenses
 export const applyRecurringExpenses = async (): Promise<number> => {
     const db = await openDB();
     const allRecurring = await getAllRecurringExpenses();
@@ -184,76 +281,93 @@ export const applyRecurringExpenses = async (): Promise<number> => {
         let lastApplied = re.lastAppliedDate ? startOfDay(new Date(re.lastAppliedDate)) : startOfDay(new Date(re.startDate));
         let nextDueDate: Date;
         
-        // Find the next due date that hasn't been processed yet
         while (true) {
-            if (re.frequency === 'monthly') {
+             if (re.frequency === 'monthly') {
                 nextDueDate = addMonths(lastApplied, 1);
             } else {
                 nextDueDate = addYears(lastApplied, 1);
             }
-
+            
             if (isBefore(nextDueDate, today) || isEqual(nextDueDate, today)) {
-                 const expenseId = `${re.id}-${nextDueDate.toISOString().split('T')[0]}`;
-                const checkTx = db.transaction(EXPENSE_STORE, 'readonly');
-                const checkStore = checkTx.objectStore(EXPENSE_STORE);
-                const checkRequest = checkStore.get(expenseId);
-                const alreadyExists = await new Promise<boolean>(res => {
-                    checkRequest.onsuccess = () => res(!!checkRequest.result);
-                    checkRequest.onerror = () => res(false); // Assume not exists on error
-                });
-                
-                if (!alreadyExists) {
-                    const addTx = db.transaction([EXPENSE_STORE, RECURRING_EXPENSE_STORE], 'readwrite');
-                    const expenseStore = addTx.objectStore(EXPENSE_STORE);
-                    const recurringStore = addTx.objectStore(RECURRING_EXPENSE_STORE);
-
-                    const newExpense: Expense = {
-                        id: expenseId,
-                        title: re.title,
-                        amount: re.amount,
-                        date: nextDueDate.toISOString(),
-                        attachments: [],
-                    };
-
-                    expenseStore.add(newExpense);
-                    
-                    const updatedRe = { ...re, lastAppliedDate: nextDueDate.toISOString() };
-                    recurringStore.put(updatedRe);
-
-                    expensesAddedCount++;
-                    await new Promise(res => { addTx.oncomplete = res });
+                if(re.lastAppliedDate && startOfDay(new Date(re.lastAppliedDate)) >= nextDueDate) {
+                     lastApplied = nextDueDate;
+                     continue;
                 }
-                lastApplied = nextDueDate;
+                const newExpense: Omit<Expense, 'id'|'attachmentIds'> = {
+                    title: re.title,
+                    amount: re.amount,
+                    date: nextDueDate.toISOString(),
+                };
+                await addExpense(newExpense, []);
+                expensesAddedCount++;
 
+                const tx = db.transaction(RECURRING_EXPENSE_STORE, 'readwrite');
+                const store = tx.objectStore(RECURRING_EXPENSE_STORE);
+                store.put({ ...re, lastAppliedDate: nextDueDate.toISOString() });
+                
+                await new Promise(res => { tx.oncomplete = res; });
+                lastApplied = nextDueDate;
             } else {
-                break; // Next due date is in the future
+                break;
             }
         }
     }
     return expensesAddedCount;
 };
 
-
 // Expense Operations
-export const addExpense = (expense: Omit<Expense, 'id'>): Promise<void> => {
+export const addExpense = (expense: Omit<Expense, 'id'|'attachmentIds'>, attachments: Omit<Attachment, 'id' | 'sourceId' | 'sourceType'>[]): Promise<void> => {
   return new Promise(async (resolve, reject) => {
     const db = await openDB();
-    const store = getStore(EXPENSE_STORE, 'readwrite');
-    const newExpense = { ...expense, id: Date.now().toString() };
-    const request = store.add(newExpense);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    const tx = db.transaction([EXPENSE_STORE, ATTACHMENT_STORE], 'readwrite');
+    const expenseStore = tx.objectStore(EXPENSE_STORE);
+    const attachmentStore = tx.objectStore(ATTACHMENT_STORE);
+    
+    const expenseId = Date.now().toString();
+
+    const attachmentIds = attachments.map(att => {
+        const attachmentId = Date.now().toString() + Math.random();
+        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expenseId, sourceType: 'expense' };
+        attachmentStore.add(newAttachment);
+        return attachmentId;
+    });
+
+    const newExpense: Expense = { ...expense, id: expenseId, attachmentIds };
+    expenseStore.add(newExpense);
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 };
 
-export const updateExpense = (expense: Expense): Promise<void> => {
-  return new Promise(async (resolve, reject) => {
+export const updateExpense = async (expense: Expense, newAttachments: Omit<Attachment, 'id'|'sourceId'|'sourceType'>[], deletedAttachmentIds: string[]): Promise<void> => {
     const db = await openDB();
-    const store = getStore(EXPENSE_STORE, 'readwrite');
-    const request = store.put(expense);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+    const tx = db.transaction([EXPENSE_STORE, ATTACHMENT_STORE], 'readwrite');
+    const expenseStore = tx.objectStore(EXPENSE_STORE);
+    const attachmentStore = tx.objectStore(ATTACHMENT_STORE);
+
+    // Delete attachments
+    deletedAttachmentIds.forEach(id => attachmentStore.delete(id));
+
+    // Add new attachments
+    const newAttachmentIds = newAttachments.map(att => {
+        const attachmentId = Date.now().toString() + Math.random();
+        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expense.id, sourceType: 'expense' };
+        attachmentStore.add(newAttachment);
+        return attachmentId;
+    });
+
+    const finalAttachmentIds = expense.attachmentIds
+      .filter(id => !deletedAttachmentIds.includes(id))
+      .concat(newAttachmentIds);
+
+    const updatedExpense: Expense = { ...expense, attachmentIds: finalAttachmentIds };
+    expenseStore.put(updatedExpense);
+    
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
 };
 
 
@@ -270,10 +384,16 @@ export const getAllExpenses = (): Promise<Expense[]> => {
 export const deleteExpense = (id: string): Promise<void> => {
     return new Promise(async (resolve, reject) => {
         const db = await openDB();
-        const store = getStore(EXPENSE_STORE, 'readwrite');
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
+        const attachments = await getAttachmentsBySourceId(id);
+        const tx = db.transaction([EXPENSE_STORE, ATTACHMENT_STORE], 'readwrite');
+        const expenseStore = tx.objectStore(EXPENSE_STORE);
+        const attachmentStore = tx.objectStore(ATTACHMENT_STORE);
+        
+        attachments.forEach(att => attachmentStore.delete(att.id));
+        expenseStore.delete(id);
+
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
     });
 };
 
@@ -399,7 +519,7 @@ export const deleteProduct = (id: string): Promise<void> => {
 };
 
 // Sale Operations
-export const addSale = async (saleData: Omit<Sale, 'id' | 'items'> & { items: Omit<SaleItem, 'totalCost'>[] }, newCustomerName?: string): Promise<void> => {
+export const addSale = async (saleData: Omit<Sale, 'id' | 'items' | 'paymentIds'> & { items: Omit<SaleItem, 'totalCost'>[], paymentIds: string[] }, newCustomerName?: string): Promise<void> => {
     const db = await openDB();
     const tx = db.transaction([SALE_STORE, PRODUCT_STORE, CUSTOMER_STORE, SETTINGS_STORE], 'readwrite');
     const saleStore = tx.objectStore(SALE_STORE);
@@ -448,7 +568,7 @@ export const addSale = async (saleData: Omit<Sale, 'id' | 'items'> & { items: Om
                 if (product) {
                     const totalCostPerUnit = calculateTotalCostInToman(product.costs, rates);
                     
-                    (saleToSave.items as SaleItem[]).push({
+                    saleToSave.items.push({
                         ...item,
                         totalCost: totalCostPerUnit * item.quantity
                     });
@@ -458,7 +578,7 @@ export const addSale = async (saleData: Omit<Sale, 'id' | 'items'> & { items: Om
                     putRequest.onsuccess = () => resolveUpdate();
                     putRequest.onerror = () => rejectUpdate(putRequest.error);
                 } else {
-                     (saleToSave.items as SaleItem[]).push({
+                     saleToSave.items.push({
                         ...item,
                         totalCost: 0
                     });

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAllSales } from '@/lib/db';
-import type { Sale, PaymentMethod } from '@/lib/types';
+import { getAllSales, getPaymentsByIds, getAttachmentsBySourceId } from '@/lib/db';
+import type { Sale, PaymentMethod, Payment, Attachment } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -32,15 +32,29 @@ const paymentMethodLabels: Record<PaymentMethod, string> = {
     ONLINE: 'آنلاین',
 };
 
+type SaleWithDetails = Sale & {
+    payments: (Payment & { attachments: Attachment[] })[];
+}
+
 export default function SalesHistoryPage() {
-  const [sales, setSales] = useState<Sale[]>([]);
+  const [salesWithDetails, setSalesWithDetails] = useState<SaleWithDetails[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     async function fetchSales() {
       try {
         const allSales = await getAllSales();
-        setSales(allSales);
+        const salesDetails: SaleWithDetails[] = await Promise.all(
+            allSales.map(async (sale) => {
+                const payments = await getPaymentsByIds(sale.paymentIds);
+                const paymentsWithAttachments = await Promise.all(payments.map(async (payment) => {
+                    const attachments = await getAttachmentsBySourceId(payment.id);
+                    return { ...payment, attachments };
+                }));
+                return { ...sale, payments: paymentsWithAttachments };
+            })
+        );
+        setSalesWithDetails(salesDetails);
       } catch (error) {
         toast({
           variant: 'destructive',
@@ -52,7 +66,7 @@ export default function SalesHistoryPage() {
     fetchSales();
   }, [toast]);
 
-  const totalPaid = (sale: Sale) => sale.payments.reduce((acc, p) => acc + p.amount, 0);
+  const totalPaid = (sale: SaleWithDetails) => sale.payments.reduce((acc, p) => acc + p.amount, 0);
 
   return (
     <div className="flex flex-col h-full">
@@ -66,9 +80,9 @@ export default function SalesHistoryPage() {
         </CardHeader>
         <CardContent>
             <ScrollArea className="h-[60vh]">
-                {sales.length > 0 ? (
+                {salesWithDetails.length > 0 ? (
                 <Accordion type="single" collapsible className="w-full">
-                    {sales.map((sale) => (
+                    {salesWithDetails.map((sale) => (
                     <AccordionItem value={`sale-${sale.id}`} key={sale.id}>
                         <AccordionTrigger>
                         <div className="flex justify-between items-center w-full pr-4">
@@ -81,7 +95,7 @@ export default function SalesHistoryPage() {
                                 </span>
                             </div>
                             <div className="flex items-center gap-4">
-                               {totalPaid(sale) < sale.total && <Badge variant="destructive">پرداخت نشده</Badge>}
+                               {totalPaid(sale) < sale.total && <Badge variant="destructive">بدهکار</Badge>}
                                 <span className="font-semibold text-lg">
                                     {sale.total.toLocaleString('fa-IR')}{' '}
                                     {CURRENCY_SYMBOLS.TOMAN}
@@ -90,7 +104,7 @@ export default function SalesHistoryPage() {
                         </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4">
                             <div>
                                 <h4 className="font-semibold mb-2">اقلام فروش</h4>
                                  <Table>
@@ -125,7 +139,7 @@ export default function SalesHistoryPage() {
                                         <TableRow>
                                             <TableHead>روش</TableHead>
                                             <TableHead>مبلغ</TableHead>
-                                            <TableHead>رسید</TableHead>
+                                            <TableHead>اسناد</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -134,18 +148,25 @@ export default function SalesHistoryPage() {
                                                 <TableCell>{paymentMethodLabels[payment.method]}</TableCell>
                                                 <TableCell>{payment.amount.toLocaleString('fa-IR')}</TableCell>
                                                 <TableCell>
-                                                    {payment.receiptNumber || '-'}
-                                                    {payment.receiptImage && (
-                                                        <Dialog>
+                                                   {payment.attachments && payment.attachments.length > 0 && (
+                                                         <Dialog>
                                                             <DialogTrigger asChild>
                                                                 <Button variant="ghost" size="icon" className="mr-2"><Paperclip className="h-4 w-4" /></Button>
                                                             </DialogTrigger>
                                                             <DialogContent>
-                                                                <DialogHeader><DialogTitle>تصویر رسید</DialogTitle></DialogHeader>
-                                                                <img src={payment.receiptImage} alt={`رسید ${payment.receiptNumber || ''}`} className="max-w-full h-auto rounded-md" />
+                                                                <DialogHeader><DialogTitle>اسناد پرداخت</DialogTitle></DialogHeader>
+                                                                <ul className="space-y-2">
+                                                                {payment.attachments.map(att => (
+                                                                    <li key={att.id} className="border p-2 rounded-md">
+                                                                        <p>{att.description || 'سند'}</p>
+                                                                        <p className="text-xs text-muted-foreground">{att.receiptNumber}</p>
+                                                                        {att.receiptImage && <img src={att.receiptImage} alt="رسید" className="mt-2 max-w-full h-auto rounded" />}
+                                                                    </li>
+                                                                ))}
+                                                                </ul>
                                                             </DialogContent>
                                                         </Dialog>
-                                                    )}
+                                                   )}
                                                 </TableCell>
                                             </TableRow>
                                         ))}

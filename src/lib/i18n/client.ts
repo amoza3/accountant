@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 
 export type Locale = string;
 export const DEFAULT_LOCALE: Locale = 'fa';
@@ -43,20 +43,14 @@ export function useCurrentLocale(): string {
 
 export function useChangeLocale() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useParams();
+
   return (nextLocale: string) => {
-    const segments = Array.isArray(params?.locale)
-      ? (params?.locale as string[])
-      : [params?.locale as string].filter(Boolean);
-    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
-    const pathParts = currentPath.split('/');
-    // Replace first non-empty segment as locale (matches /[locale]/... structure)
-    const idx = pathParts.findIndex((p) => p.length > 0);
-    if (idx >= 0) {
-      pathParts[idx] = nextLocale;
-    }
-    const nextPath = pathParts.join('/') || `/${nextLocale}`;
-    router.push(encodeURI(nextPath));
+    const currentLocale = params.locale as string;
+    // Replace the current locale in the pathname with the next one
+    const newPathname = pathname.replace(`/${currentLocale}`, `/${nextLocale}`);
+    router.push(encodeURI(newPathname));
   };
 }
 
