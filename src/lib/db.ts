@@ -6,7 +6,7 @@ import { addMonths, addYears, isBefore, startOfDay, isEqual, endOfMonth } from '
 
 
 const DB_NAME = 'EasyStockDB';
-const DB_VERSION = 9; // Incremented version
+const DB_VERSION = 11; // Incremented version for new schema
 const PRODUCT_STORE = 'products';
 const SALE_STORE = 'sales';
 const SETTINGS_STORE = 'settings';
@@ -124,7 +124,7 @@ export const addPayment = async (paymentData: Omit<Payment, 'id' | 'attachmentId
     
     const paymentId = Date.now().toString() + Math.random();
     
-    const attachmentPromises = attachments.map(att => {
+    const attachmentIds = attachments.map(att => {
         const attachmentId = Date.now().toString() + Math.random();
         const newAttachment: Attachment = {
             ...att,
@@ -139,7 +139,7 @@ export const addPayment = async (paymentData: Omit<Payment, 'id' | 'attachmentId
     const newPayment: Payment = {
         ...paymentData,
         id: paymentId,
-        attachmentIds: attachmentPromises
+        attachmentIds: attachmentIds,
     };
 
     paymentStore.add(newPayment);
@@ -152,11 +152,15 @@ export const addPayment = async (paymentData: Omit<Payment, 'id' | 'attachmentId
 
 export const getPaymentsByIds = (ids: string[]): Promise<Payment[]> => {
     return new Promise(async (resolve, reject) => {
-        if (ids.length === 0) return resolve([]);
+        if (!ids || ids.length === 0) return resolve([]);
         const db = await openDB();
         const store = getStore(PAYMENT_STORE, 'readonly');
         const results: Payment[] = [];
         let count = 0;
+        if (ids.length === 0) {
+            resolve([]);
+            return;
+        }
         ids.forEach(id => {
             const request = store.get(id);
             request.onsuccess = () => {
@@ -305,7 +309,7 @@ export const applyRecurringExpenses = async (): Promise<number> => {
                 const store = tx.objectStore(RECURRING_EXPENSE_STORE);
                 store.put({ ...re, lastAppliedDate: nextDueDate.toISOString() });
                 
-                await new Promise(res => { tx.oncomplete = res; });
+                await new Promise<void>(res => { tx.oncomplete = () => res(); });
                 lastApplied = nextDueDate;
             } else {
                 break;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle, UserPlus, Search, Paperclip } from 'lucide-react';
+import { Barcode, Trash2, ShoppingCart, MinusCircle, PlusCircle, UserPlus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { getProductById, addSale, getAllCustomers, getAllProducts, addPayment } from '@/lib/db';
-import type { SaleItem, Customer, PaymentMethod, Product, Payment } from '@/lib/types';
+import type { SaleItem, Customer, PaymentMethod, Product, Payment, Attachment } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
@@ -58,17 +58,190 @@ import {
     FormLabel,
     FormMessage,
 } from '@/components/ui/form';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
+
+const attachmentSchema = z.object({
+  date: z.string().min(1, 'تاریخ سند الزامی است'),
+  description: z.string().optional(),
+  receiptNumber: z.string().optional(),
+  receiptImage: z.string().optional(), // Base64
+});
 
 const paymentFormSchema = z.object({
   amount: z.coerce.number().min(1, 'مبلغ باید بزرگتر از صفر باشد'),
   method: z.enum(['CASH', 'CARD', 'ONLINE']),
-  receiptNumber: z.string().optional(),
-  receiptImage: z.string().optional(),
+  date: z.string().min(1, 'تاریخ پرداخت الزامی است'),
 });
 
+function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void }) {
+    const form = useForm<z.infer<typeof attachmentSchema>>({
+        resolver: zodResolver(attachmentSchema),
+        defaultValues: { description: '', receiptNumber: '', receiptImage: '', date: new Date().toISOString().split('T')[0] },
+    });
+    
+    const [preview, setPreview] = useState('');
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreview(reader.result as string);
+                form.setValue('receiptImage', reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const handleSubmit = (data: z.infer<typeof attachmentSchema>) => {
+        onAddAttachment(data);
+        form.reset();
+        setPreview('');
+    }
+
+    return (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 p-4 border rounded-md">
+                 <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>تاریخ سند</FormLabel>
+                        <FormControl>
+                            <Input type="date" {...field} />
+                        </FormControl>
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>توضیحات (اختیاری)</FormLabel>
+                        <FormControl>
+                            <Textarea placeholder="جزئیات بیشتر..." {...field} />
+                        </FormControl>
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="receiptNumber"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>شماره رسید/سند (اختیاری)</FormLabel>
+                        <FormControl>
+                            <Input placeholder="123456" {...field} />
+                        </FormControl>
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="receiptImage"
+                    render={() => (
+                        <FormItem>
+                        <FormLabel>تصویر رسید (اختیاری)</FormLabel>
+                        <FormControl>
+                            <Input type="file" accept="image/*" onChange={handleFileChange} className="pt-2"/>
+                        </FormControl>
+                        </FormItem>
+                    )}
+                    />
+                {preview && (
+                    <div className="relative w-32 h-32">
+                        <img src={preview} alt="پیش‌نمایش رسید" className="rounded-md object-cover w-full h-full" />
+                        <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6" onClick={() => { form.setValue('receiptImage', ''); setPreview(''); }}>
+                            <Trash2 className="h-4 w-4"/>
+                        </Button>
+                    </div>
+                )}
+                 <Button type="submit">افزودن سند</Button>
+            </form>
+        </Form>
+    );
+}
+
+function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, 'id'>, attachments: Omit<Attachment, 'id'|'sourceId'|'sourceType'>[]) => void }) {
+    const [attachments, setAttachments] = useState<z.infer<typeof attachmentSchema>[]>([]);
+    const form = useForm<z.infer<typeof paymentFormSchema>>({
+        resolver: zodResolver(paymentFormSchema),
+        defaultValues: { amount: 0, method: 'CARD', date: new Date().toISOString().split('T')[0] }
+    });
+
+    const handleAddAttachment = (data: z.infer<typeof attachmentSchema>) => {
+        setAttachments([...attachments, data]);
+    }
+
+    const handleSubmit = (data: z.infer<typeof paymentFormSchema>) => {
+        onAddPayment({ ...data, attachmentIds: [] }, attachments);
+        form.reset();
+        setAttachments([]);
+    }
+
+    return (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 p-4 border rounded-md">
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="amount" render={({field}) => (
+                        <FormItem>
+                            <FormLabel>مبلغ پرداخت</FormLabel>
+                            <FormControl><Input type="number" {...field} /></FormControl>
+                            <FormMessage/>
+                        </FormItem>
+                    )}/>
+                     <FormField control={form.control} name="date" render={({field}) => (
+                        <FormItem>
+                            <FormLabel>تاریخ پرداخت</FormLabel>
+                            <FormControl><Input type="date" {...field} /></FormControl>
+                             <FormMessage/>
+                        </FormItem>
+                    )}/>
+                </div>
+                <FormField control={form.control} name="method" render={({field}) => (
+                        <FormItem>
+                        <FormLabel>روش پرداخت</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {Object.entries(paymentMethodLabels).map(([method, label]) => (
+                                    <SelectItem key={method} value={method}>{label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                         <FormMessage/>
+                    </FormItem>
+                )}/>
+                <Separator />
+                <div className="space-y-2">
+                    <Label>اسناد پیوست</Label>
+                    {attachments.map((att, i) => (
+                         <div key={i} className="flex items-center justify-between p-2 border rounded-md">
+                            <span>{att.receiptNumber || att.description || 'سند'}</span>
+                             <Button type="button" size="icon" variant="ghost" onClick={() => setAttachments(attachments.filter((_, idx) => idx !== i))}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                        </div>
+                    ))}
+                    <Dialog>
+                        <DialogTrigger asChild><Button type="button" variant="outline" size="sm">افزودن سند</Button></DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader><DialogTitle>افزودن سند برای این پرداخت</DialogTitle></DialogHeader>
+                            <AttachmentForm onAddAttachment={handleAddAttachment} />
+                        </DialogContent>
+                    </Dialog>
+                </div>
+                <Button type="submit" size="sm">افزودن پرداخت</Button>
+            </form>
+        </Form>
+    );
+}
 
 export default function RecordSalePage() {
   const [cart, setCart] = useState<Omit<SaleItem, 'totalCost'>[]>([]);
@@ -84,7 +257,9 @@ export default function RecordSalePage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
-  const [payments, setPayments] = useState<Omit<Payment, 'id' | 'attachmentIds'>[]>([]);
+  
+  type TempPayment = Omit<Payment, 'id'> & { attachments: Omit<Attachment, 'id'|'sourceId'|'sourceType'>[] };
+  const [payments, setPayments] = useState<TempPayment[]>([]);
 
   const paymentMethodLabels: Record<PaymentMethod, string> = {
     CASH: 'نقد',
@@ -92,16 +267,6 @@ export default function RecordSalePage() {
     ONLINE: 'آنلاین',
   };
   
-  const paymentForm = useForm<z.infer<typeof paymentFormSchema>>({
-    resolver: zodResolver(paymentFormSchema),
-    defaultValues: {
-        amount: 0,
-        method: 'CARD',
-        receiptNumber: '',
-        receiptImage: '',
-    },
-  });
-
   useEffect(() => {
     barcodeRef.current?.focus();
     async function fetchData() {
@@ -118,11 +283,6 @@ export default function RecordSalePage() {
   const total = useMemo(() => cart.reduce((acc, item) => acc + item.price * item.quantity, 0), [cart]);
   const totalPaid = useMemo(() => payments.reduce((acc, p) => acc + p.amount, 0), [payments]);
   const remainingAmount = useMemo(() => total - totalPaid, [total, totalPaid]);
-
-   useEffect(() => {
-    paymentForm.setValue('amount', remainingAmount > 0 ? remainingAmount : 0);
-  }, [remainingAmount, paymentForm]);
-
 
   const handleAddProductToCart = useCallback((product: Product) => {
      if (product.quantity <= 0) {
@@ -208,14 +368,8 @@ export default function RecordSalePage() {
     setCart(cart.map(item => item.productId === productId ? { ...item, quantity: newQuantity } : item));
   };
   
-  const handleAddPayment = (data: z.infer<typeof paymentFormSchema>) => {
-      setPayments([...payments, { ...data, attachments: [] }]);
-      paymentForm.reset({
-        amount: remainingAmount - data.amount > 0 ? remainingAmount - data.amount : 0,
-        method: 'CARD',
-        receiptNumber: '',
-        receiptImage: '',
-      });
+  const handleAddPayment = (payment: Omit<Payment, 'id'>, attachments: Omit<Attachment, 'id'|'sourceId'|'sourceType'>[]) => {
+      setPayments([...payments, { ...payment, attachments }]);
   }
 
   const completeSale = async () => {
@@ -235,7 +389,10 @@ export default function RecordSalePage() {
         }
         
         const paymentIds = await Promise.all(
-            payments.map(p => addPayment({amount: p.amount, method: p.method, date: new Date().toISOString()}, []))
+            payments.map(p => {
+                const { attachments, ...paymentData } = p;
+                return addPayment(paymentData, attachments);
+            })
         );
 
         await addSale({
@@ -358,32 +515,7 @@ export default function RecordSalePage() {
                     <Separator/>
                     <div>
                         <h4 className="font-medium mb-2">ثبت پرداخت جدید</h4>
-                        <Form {...paymentForm}>
-                            <form onSubmit={paymentForm.handleSubmit(handleAddPayment)} className="space-y-4 p-4 border rounded-md">
-                                <FormField control={paymentForm.control} name="amount" render={({field}) => (
-                                    <FormItem>
-                                        <FormLabel>مبلغ پرداخت</FormLabel>
-                                        <FormControl><Input type="number" {...field} /></FormControl>
-                                    </FormItem>
-                                )}/>
-                                <FormField control={paymentForm.control} name="method" render={({field}) => (
-                                     <FormItem>
-                                        <FormLabel>روش پرداخت</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger><SelectValue/></SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {Object.entries(paymentMethodLabels).map(([method, label]) => (
-                                                    <SelectItem key={method} value={method}>{label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormItem>
-                                )}/>
-                                <Button type="submit" size="sm">افزودن پرداخت</Button>
-                            </form>
-                        </Form>
+                        <PaymentForm onAddPayment={handleAddPayment}/>
                     </div>
 
                      {payments.length > 0 && (

@@ -61,12 +61,13 @@ const attachmentSchema = z.object({
   description: z.string().optional(),
   receiptNumber: z.string().optional(),
   receiptImage: z.string().optional(), // Base64
+  date: z.string().min(1, 'تاریخ سند الزامی است'),
 });
 
 const expenseSchema = z.object({
   title: z.string().min(1, 'عنوان هزینه الزامی است'),
   amount: z.coerce.number().min(1, 'مبلغ باید بزرگتر از صفر باشد'),
-  attachments: z.array(attachmentSchema).optional(),
+  date: z.string().min(1, 'تاریخ هزینه الزامی است'),
 });
 
 const recurringExpenseSchema = z.object({
@@ -77,13 +78,13 @@ const recurringExpenseSchema = z.object({
 });
 
 
-function AttachmentForm({ onAddAttachment, attachmentToEdit, onUpdateAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void, attachmentToEdit?: Partial<Attachment>, onUpdateAttachment?: (data: Partial<Attachment>) => void }) {
+function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void }) {
     const form = useForm<z.infer<typeof attachmentSchema>>({
         resolver: zodResolver(attachmentSchema),
-        defaultValues: attachmentToEdit || { description: '', receiptNumber: '', receiptImage: '' },
+        defaultValues: { description: '', receiptNumber: '', receiptImage: '', date: new Date().toISOString().split('T')[0] },
     });
     
-    const [preview, setPreview] = useState(attachmentToEdit?.receiptImage || '');
+    const [preview, setPreview] = useState('');
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -98,11 +99,7 @@ function AttachmentForm({ onAddAttachment, attachmentToEdit, onUpdateAttachment 
     };
     
     const handleSubmit = (data: z.infer<typeof attachmentSchema>) => {
-        if(attachmentToEdit && onUpdateAttachment){
-            onUpdateAttachment({ ...attachmentToEdit, ...data });
-        } else {
-            onAddAttachment(data);
-        }
+        onAddAttachment(data);
         form.reset();
         setPreview('');
     }
@@ -110,6 +107,18 @@ function AttachmentForm({ onAddAttachment, attachmentToEdit, onUpdateAttachment 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 p-4 border rounded-md">
+                 <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>تاریخ سند</FormLabel>
+                        <FormControl>
+                            <Input type="date" {...field} />
+                        </FormControl>
+                        </FormItem>
+                    )}
+                />
                  <FormField
                     control={form.control}
                     name="description"
@@ -154,9 +163,7 @@ function AttachmentForm({ onAddAttachment, attachmentToEdit, onUpdateAttachment 
                         </Button>
                     </div>
                 )}
-                 <Button type="submit">
-                    {attachmentToEdit ? 'بروزرسانی سند' : 'افزودن سند'}
-                </Button>
+                 <Button type="submit">افزودن سند</Button>
             </form>
         </Form>
     );
@@ -168,7 +175,7 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
   const [deletedAttachmentIds, setDeletedAttachmentIds] = useState<string[]>([]);
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: expenseToEdit || { title: '', amount: 0 },
+    defaultValues: expenseToEdit || { title: '', amount: 0, date: new Date().toISOString().split('T')[0] },
   });
 
   const handleAddAttachment = (data: z.infer<typeof attachmentSchema>) => {
@@ -193,7 +200,6 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
         } else {
             await addExpense({
                 ...data,
-                date: new Date().toISOString(),
             }, attachmentData);
             toast({ title: 'موفق', description: 'هزینه جدید با موفقیت ثبت شد.' });
             form.reset();
@@ -228,19 +234,34 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>مبلغ (تومان)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="500,000" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>مبلغ (تومان)</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="500,000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                 <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>تاریخ هزینه</FormLabel>
+                    <FormControl>
+                        <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
             
             <div className="space-y-4">
                 <Label>اسناد پیوست</Label>
@@ -430,13 +451,8 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
     );
 }
 
-function ExpenseListItem({ expense }: { expense: Expense & { attachments: Attachment[] } }) {
+function ExpenseListItem({ expense, onUpdate }: { expense: Expense & { attachments: Attachment[] }, onUpdate: () => void }) {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-    const onUpdateSuccess = () => {
-        // This is a placeholder. The parent component will refetch the data.
-        setIsEditDialogOpen(false);
-    };
 
     return (
         <li className="flex items-center justify-between p-4">
@@ -483,10 +499,13 @@ function ExpenseListItem({ expense }: { expense: Expense & { attachments: Attach
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
-                        <DialogHeader>
+                         <DialogHeader>
                             <DialogTitle>ویرایش هزینه</DialogTitle>
                         </DialogHeader>
-                        <ExpenseForm expenseToEdit={expense} onExpenseUpdated={onUpdateSuccess} onExpenseAdded={() => {}} />
+                        <ExpenseForm expenseToEdit={expense} onExpenseUpdated={() => {
+                            onUpdate();
+                            setIsEditDialogOpen(false);
+                        }} onExpenseAdded={() => {}} />
                     </DialogContent>
                 </Dialog>
                 <AlertDialog>
@@ -568,7 +587,6 @@ export default function ExpensesPage() {
   useEffect(() => {
     fetchExpenses();
     
-    // Make handleDelete global for AlertDialog
     (window as any).handleDeleteExpense = async (id: string) => {
       try {
         await deleteExpense(id);
@@ -627,7 +645,7 @@ export default function ExpensesPage() {
                 {expenses.length > 0 ? (
                 <ul className="divide-y divide-border">
                     {expenses.map((expense) => (
-                       <ExpenseListItem key={expense.id} expense={expense} />
+                       <ExpenseListItem key={expense.id} expense={expense} onUpdate={fetchExpenses} />
                     ))}
                 </ul>
                 ) : (
