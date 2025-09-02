@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,7 +20,8 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
+  FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +32,7 @@ import { useAppContext } from '@/components/app-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { StorageType } from '@/hooks/use-db';
 import { Label } from '@/components/ui/label';
+import { useI18n } from '@/lib/i18n/client';
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -61,6 +63,7 @@ const firebaseConfigSchema = z.object({
 });
 
 function ExchangeRatesForm() {
+    const { t } = useI18n();
     const { toast } = useToast();
   const { db } = useAppContext();
   const form = useForm<z.infer<typeof exchangeRatesSchema>>({
@@ -402,7 +405,7 @@ function FirebaseSettingsForm() {
         } else {
             form.reset(defaultConfig);
         }
-    }, [form]);
+    }, [form, defaultConfig]);
 
     const onSubmit = (data: FirebaseConfig) => {
         localStorage.setItem('firebaseConfig', JSON.stringify(data));
