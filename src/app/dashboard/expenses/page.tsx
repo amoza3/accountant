@@ -81,7 +81,7 @@ const recurringExpenseSchema = z.object({
 function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void }) {
     const form = useForm<z.infer<typeof attachmentSchema>>({
         resolver: zodResolver(attachmentSchema),
-        defaultValues: { description: '', receiptNumber: '', receiptImage: '', date: new Date().toISOString().split('T')[0] },
+        defaultValues: { description: '', receiptNumber: '', receiptImage: '', date: new Date().toISOString().slice(0, 16) },
     });
     
     const [preview, setPreview] = useState('');
@@ -112,9 +112,9 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                     name="date"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>تاریخ سند</FormLabel>
+                        <FormLabel>تاریخ و ساعت سند</FormLabel>
                         <FormControl>
-                            <Input type="date" {...field} />
+                            <Input type="datetime-local" {...field} />
                         </FormControl>
                         </FormItem>
                     )}
@@ -175,32 +175,37 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
   const [deletedAttachmentIds, setDeletedAttachmentIds] = useState<string[]>([]);
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: expenseToEdit || { title: '', amount: 0, date: new Date().toISOString().split('T')[0] },
+    defaultValues: expenseToEdit ? {
+        ...expenseToEdit,
+        date: expenseToEdit.date.slice(0, 16)
+    } : { title: '', amount: 0, date: new Date().toISOString().slice(0, 16) },
   });
 
   const handleAddAttachment = (data: z.infer<typeof attachmentSchema>) => {
-      setAttachments([...attachments, { ...data, id: Date.now().toString()}]);
+      setAttachments([...attachments, { ...data, id: `new-${Date.now()}`}]);
   }
   
   const handleRemoveAttachment = (id: string) => {
       setAttachments(attachments.filter(att => att.id !== id));
-      if(!id.startsWith('new-')) { // Only track deletions of existing attachments
+      if(!id.startsWith('new-')) {
           setDeletedAttachmentIds([...deletedAttachmentIds, id]);
       }
   }
 
   const onSubmit = async (data: z.infer<typeof expenseSchema>) => {
     try {
-        const attachmentData = attachments.map(({id, ...rest}) => rest);
+        const newAttachmentsData = attachments
+            .filter(att => att.id?.startsWith('new-'))
+            .map(({id, ...rest}) => rest) as Omit<Attachment, 'id'|'sourceId'|'sourceType'>[];
+
         if (expenseToEdit && onExpenseUpdated) {
-            const newAttachments = attachmentData.filter(att => !expenseToEdit.attachmentIds.includes((att as Attachment).id)) as Omit<Attachment, 'id'|'sourceId'|'sourceType'>[];
-            await updateExpense({ ...expenseToEdit, ...data}, newAttachments, deletedAttachmentIds);
+            await updateExpense({ ...expenseToEdit, ...data}, newAttachmentsData, deletedAttachmentIds);
             toast({ title: 'موفق', description: 'هزینه با موفقیت بروزرسانی شد.' });
             onExpenseUpdated();
         } else {
             await addExpense({
                 ...data,
-            }, attachmentData);
+            }, newAttachmentsData);
             toast({ title: 'موفق', description: 'هزینه جدید با موفقیت ثبت شد.' });
             form.reset();
             setAttachments([]);
@@ -253,9 +258,9 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
                 name="date"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>تاریخ هزینه</FormLabel>
+                    <FormLabel>تاریخ و ساعت هزینه</FormLabel>
                     <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="datetime-local" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -463,7 +468,7 @@ function ExpenseListItem({ expense, onUpdate }: { expense: Expense & { attachmen
                 <div>
                     <p className="font-semibold">{expense.title}</p>
                     <p className="text-sm text-muted-foreground">
-                        {new Date(expense.date).toLocaleDateString('fa-IR')}
+                        {new Date(expense.date).toLocaleString('fa-IR', { dateStyle: 'short', timeStyle: 'short'})}
                     </p>
                 </div>
             </div>
@@ -481,7 +486,7 @@ function ExpenseListItem({ expense, onUpdate }: { expense: Expense & { attachmen
                                 {expense.attachments.map(att => (
                                     <li key={att.id} className="border p-2 rounded-md">
                                         <p>{att.description || 'سند'}</p>
-                                        <p className="text-xs text-muted-foreground">{att.receiptNumber}</p>
+                                        <p className="text-xs text-muted-foreground">{new Date(att.date).toLocaleString('fa-IR', { dateStyle: 'short', timeStyle: 'short'})} - {att.receiptNumber}</p>
                                         {att.receiptImage && <img src={att.receiptImage} alt="رسید" className="mt-2 max-w-full h-auto rounded" />}
                                     </li>
                                 ))}

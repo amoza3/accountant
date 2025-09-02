@@ -78,7 +78,7 @@ const paymentFormSchema = z.object({
 function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void }) {
     const form = useForm<z.infer<typeof attachmentSchema>>({
         resolver: zodResolver(attachmentSchema),
-        defaultValues: { description: '', receiptNumber: '', receiptImage: '', date: new Date().toISOString().split('T')[0] },
+        defaultValues: { description: '', receiptNumber: '', receiptImage: '', date: new Date().toISOString().slice(0, 16) },
     });
     
     const [preview, setPreview] = useState('');
@@ -109,9 +109,9 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                     name="date"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>تاریخ سند</FormLabel>
+                        <FormLabel>تاریخ و ساعت سند</FormLabel>
                         <FormControl>
-                            <Input type="date" {...field} />
+                            <Input type="datetime-local" {...field} />
                         </FormControl>
                         </FormItem>
                     )}
@@ -170,7 +170,7 @@ function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, '
     const [attachments, setAttachments] = useState<z.infer<typeof attachmentSchema>[]>([]);
     const form = useForm<z.infer<typeof paymentFormSchema>>({
         resolver: zodResolver(paymentFormSchema),
-        defaultValues: { amount: 0, method: 'CARD', date: new Date().toISOString().split('T')[0] }
+        defaultValues: { amount: 0, method: 'CARD', date: new Date().toISOString().slice(0, 16) }
     });
 
     const handleAddAttachment = (data: z.infer<typeof attachmentSchema>) => {
@@ -196,8 +196,8 @@ function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, '
                     )}/>
                      <FormField control={form.control} name="date" render={({field}) => (
                         <FormItem>
-                            <FormLabel>تاریخ پرداخت</FormLabel>
-                            <FormControl><Input type="date" {...field} /></FormControl>
+                            <FormLabel>تاریخ و ساعت پرداخت</FormLabel>
+                            <FormControl><Input type="datetime-local" {...field} /></FormControl>
                              <FormMessage/>
                         </FormItem>
                     )}/>
