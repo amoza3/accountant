@@ -1,6 +1,6 @@
 'use client';
 
-import { db, storage } from './firebase';
+import { getDb, getStorageInstance } from './firebase';
 import {
     collection,
     doc,
@@ -33,20 +33,24 @@ const PAYMENTS_COLLECTION = 'payments';
 export const FirestoreDataProvider: DataProvider = {
   // Product Operations
   addProduct: async (product) => {
+    const db = getDb();
     const docRef = doc(db, PRODUCTS_COLLECTION, product.id);
     await setDoc(docRef, product);
   },
   getAllProducts: async () => {
+    const db = getDb();
     const q = collection(db, PRODUCTS_COLLECTION);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Product);
   },
   getProductById: async (id) => {
+    const db = getDb();
     const docRef = doc(db, PRODUCTS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? (docSnap.data() as Product) : undefined;
   },
   updateProduct: async (originalId, product) => {
+     const db = getDb();
      if (originalId !== product.id) {
         await deleteDoc(doc(db, PRODUCTS_COLLECTION, originalId));
      }
@@ -54,14 +58,16 @@ export const FirestoreDataProvider: DataProvider = {
      await setDoc(docRef, product);
   },
   deleteProduct: async (id) => {
+    const db = getDb();
     const docRef = doc(db, PRODUCTS_COLLECTION, id);
     await deleteDoc(docRef);
   },
 
   // Sale Operations
   addSale: async (saleData, newCustomerName) => {
+    const db = getDb();
     return runTransaction(db, async (transaction) => {
-        const saleId = Date.now();
+        const saleId = Date.now().toString();
         let customerId = saleData.customerId;
         let customerName = saleData.customerName;
 
@@ -102,13 +108,15 @@ export const FirestoreDataProvider: DataProvider = {
     });
   },
   getAllSales: async () => {
+    const db = getDb();
     const q = collection(db, SALES_COLLECTION);
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => doc.data() as Sale).sort((a,b) => b.id - a.id);
+    return querySnapshot.docs.map(doc => doc.data() as Sale).sort((a,b) => Number(b.id) - Number(a.id));
   },
 
   // Settings Operations
   getExchangeRates: async () => {
+    const db = getDb();
     const docRef = doc(db, SETTINGS_COLLECTION, 'exchangeRates');
     const docSnap = await getDoc(docRef);
     if(docSnap.exists()){
@@ -121,73 +129,95 @@ export const FirestoreDataProvider: DataProvider = {
     ];
   },
   saveExchangeRates: async (rates) => {
+    const db = getDb();
     await setDoc(doc(db, SETTINGS_COLLECTION, 'exchangeRates'), { value: rates });
   },
   getCostTitles: async () => {
+    const db = getDb();
     const q = collection(db, COST_TITLES_COLLECTION);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as CostTitle);
   },
   addCostTitle: async (costTitle) => {
+    const db = getDb();
     await setDoc(doc(db, COST_TITLES_COLLECTION, costTitle.id), costTitle);
   },
   deleteCostTitle: async (id) => {
+    const db = getDb();
     await deleteDoc(doc(db, COST_TITLES_COLLECTION, id));
   },
   
   // Customer Operations
   addCustomer: async (customerData) => {
+    const db = getDb();
     const id = Date.now().toString();
     const customer = { ...customerData, id };
     await setDoc(doc(db, CUSTOMERS_COLLECTION, id), customer);
     return id;
   },
   getAllCustomers: async () => {
+    const db = getDb();
     const q = collection(db, CUSTOMERS_COLLECTION);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Customer);
   },
   getCustomerById: async (id) => {
+    const db = getDb();
     const docRef = doc(db, CUSTOMERS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? (docSnap.data() as Customer) : undefined;
   },
   updateCustomer: async (customer) => {
+    const db = getDb();
     await setDoc(doc(db, CUSTOMERS_COLLECTION, customer.id), customer);
   },
   deleteCustomer: async (id) => {
+    const db = getDb();
     await deleteDoc(doc(db, CUSTOMERS_COLLECTION, id));
   },
   
   // Expense Operations
   addExpense: async (expense, attachments) => {
+    const db = getDb();
     const batch = writeBatch(db);
     const expenseId = Date.now().toString();
     
-    const attachmentIds = attachments.map(att => {
+    const attachmentIds = await Promise.all(attachments.map(async (att) => {
         const attachmentId = Date.now().toString() + Math.random();
-        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expenseId, sourceType: 'expense' };
+        let receiptImageURL = att.receiptImage;
+        if (receiptImageURL && receiptImageURL.startsWith('data:')) {
+           const blob = await (await fetch(receiptImageURL)).blob();
+           receiptImageURL = await FirestoreDataProvider.uploadFile(new File([blob], "receipt.png"));
+        }
+        
+        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expenseId, sourceType: 'expense', receiptImage: receiptImageURL };
         batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
         return attachmentId;
-    });
+    }));
 
     const newExpense: Expense = { ...expense, id: expenseId, attachmentIds };
     batch.set(doc(db, EXPENSES_COLLECTION, expenseId), newExpense);
     await batch.commit();
   },
   updateExpense: async (expense, newAttachments, deletedAttachmentIds) => {
+    const db = getDb();
     const batch = writeBatch(db);
 
     deletedAttachmentIds.forEach(id => {
         batch.delete(doc(db, ATTACHMENTS_COLLECTION, id));
     });
 
-    const newAttachmentIds = newAttachments.map(att => {
+    const newAttachmentIds = await Promise.all(newAttachments.map(async (att) => {
         const attachmentId = Date.now().toString() + Math.random();
-        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expense.id, sourceType: 'expense' };
+        let receiptImageURL = att.receiptImage;
+        if (receiptImageURL && receiptImageURL.startsWith('data:')) {
+           const blob = await (await fetch(receiptImageURL)).blob();
+           receiptImageURL = await FirestoreDataProvider.uploadFile(new File([blob], "receipt.png"));
+        }
+        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expense.id, sourceType: 'expense', receiptImage: receiptImageURL };
         batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
         return attachmentId;
-    });
+    }));
     
     const finalAttachmentIds = (expense.attachmentIds || [])
       .filter(id => !deletedAttachmentIds.includes(id))
@@ -199,11 +229,13 @@ export const FirestoreDataProvider: DataProvider = {
     await batch.commit();
   },
   getAllExpenses: async () => {
+    const db = getDb();
     const q = collection(db, EXPENSES_COLLECTION);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Expense).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
   deleteExpense: async (id) => {
+     const db = getDb();
      const batch = writeBatch(db);
      const attachments = await FirestoreDataProvider.getAttachmentsBySourceId(id);
      attachments.forEach(att => batch.delete(doc(db, ATTACHMENTS_COLLECTION, att.id)));
@@ -213,17 +245,21 @@ export const FirestoreDataProvider: DataProvider = {
   
   // Recurring Expense Operations
   addRecurringExpense: async (expense) => {
+    const db = getDb();
     await setDoc(doc(db, RECURRING_EXPENSES_COLLECTION, expense.id), expense);
   },
   getAllRecurringExpenses: async () => {
+    const db = getDb();
     const q = collection(db, RECURRING_EXPENSES_COLLECTION);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as RecurringExpense);
   },
   deleteRecurringExpense: async (id) => {
+    const db = getDb();
     await deleteDoc(doc(db, RECURRING_EXPENSES_COLLECTION, id));
   },
   applyRecurringExpenses: async () => {
+    const db = getDb();
     const recurringExpenses = await FirestoreDataProvider.getAllRecurringExpenses();
     const today = startOfDay(new Date());
     let expensesAddedCount = 0;
@@ -271,6 +307,7 @@ export const FirestoreDataProvider: DataProvider = {
 
   // Employee Operations
   addEmployee: async (employeeData) => {
+    const db = getDb();
     const batch = writeBatch(db);
     const employeeId = Date.now().toString();
     const recurringExpenseId = `salary-${employeeId}`;
@@ -294,11 +331,13 @@ export const FirestoreDataProvider: DataProvider = {
     await batch.commit();
   },
   getAllEmployees: async () => {
+    const db = getDb();
     const q = collection(db, EMPLOYEES_COLLECTION);
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Employee);
   },
   deleteEmployee: async (id) => {
+    const db = getDb();
     const batch = writeBatch(db);
     const employeeDoc = await getDoc(doc(db, EMPLOYEES_COLLECTION, id));
     const employee = employeeDoc.data() as Employee;
@@ -311,11 +350,13 @@ export const FirestoreDataProvider: DataProvider = {
 
   // Attachment Operations
   getAttachmentsBySourceId: async (sourceId) => {
+    const db = getDb();
     const q = query(collection(db, ATTACHMENTS_COLLECTION), where("sourceId", "==", sourceId));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as Attachment);
   },
   uploadFile: async (file: File): Promise<string> => {
+    const storage = getStorageInstance();
     const storageRef = ref(storage, `attachments/${Date.now()}-${file.name}`);
     const snapshot = await uploadBytes(storageRef, file);
     const downloadURL = await getDownloadURL(snapshot.ref);
@@ -324,20 +365,27 @@ export const FirestoreDataProvider: DataProvider = {
   
   // Payment Operations
   addPayment: async (paymentData, attachments) => {
+    const db = getDb();
     const batch = writeBatch(db);
     const paymentId = Date.now().toString() + Math.random();
     
-    const attachmentIds = attachments.map(att => {
+    const attachmentIds = await Promise.all(attachments.map(async (att) => {
         const attachmentId = Date.now().toString() + Math.random();
+         let receiptImageURL = att.receiptImage;
+        if (receiptImageURL && receiptImageURL.startsWith('data:')) {
+           const blob = await (await fetch(receiptImageURL)).blob();
+           receiptImageURL = await FirestoreDataProvider.uploadFile(new File([blob], "receipt.png"));
+        }
         const newAttachment: Attachment = {
             ...att,
             id: attachmentId,
             sourceId: paymentId,
             sourceType: 'payment',
+            receiptImage: receiptImageURL,
         };
         batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
         return attachmentId;
-    });
+    }));
 
     const newPayment: Payment = {
         ...paymentData,
@@ -349,6 +397,7 @@ export const FirestoreDataProvider: DataProvider = {
     return paymentId;
   },
   getPaymentsByIds: async (ids) => {
+    const db = getDb();
     const validIds = ids?.filter(id => !!id) || [];
     if (validIds.length === 0) return [];
     

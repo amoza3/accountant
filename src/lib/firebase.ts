@@ -1,13 +1,17 @@
 'use client';
 
-import { initializeApp, getApp, getApps, type FirebaseOptions } from 'firebase/app';
+import { initializeApp, getApp, getApps, deleteApp, type FirebaseOptions } from 'firebase/app';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from "firebase/storage";
 
+let appInstance: ReturnType<typeof initializeApp> | null = null;
+let currentConfig: string | null = null;
 
-const createFirebaseApp = () => {
+// This function now ensures that the app is initialized with the latest config from localStorage.
+export const createFirebaseApp = () => {
     const firebaseConfigStr = typeof window !== 'undefined' ? localStorage.getItem('firebaseConfig') : null;
     
+    // Default config as a fallback
     const defaultConfig: FirebaseOptions = {
         projectId: 'easystock-wlf7q',
         appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
@@ -18,28 +22,52 @@ const createFirebaseApp = () => {
     };
 
     const firebaseConfig = firebaseConfigStr ? JSON.parse(firebaseConfigStr) : defaultConfig;
-
-    if (getApps().length > 0) {
-        // A hack to re-evaluate the config if it has changed.
-        // This is not ideal, but works for this client-side scenario.
-        const currentApp = getApp();
-        const currentConfig = currentApp.options;
-        if (JSON.stringify(currentConfig) !== JSON.stringify(firebaseConfig)) {
-            // This is a bit of a nuclear option, but necessary if config changes.
-            // In a real app, you might want to handle this more gracefully.
-            return initializeApp(firebaseConfig, `app-${Date.now()}`);
+    const newConfigStr = JSON.stringify(firebaseConfig);
+    
+    // If there's no instance or the config has changed, create a new app instance
+    if (!appInstance || currentConfig !== newConfigStr) {
+        if (appInstance) {
+            // If an old instance exists, delete it before creating a new one
+            deleteApp(appInstance).catch(console.error);
         }
-        return currentApp;
-    } else {
-       return initializeApp(firebaseConfig);
+        
+        appInstance = initializeApp(firebaseConfig, `app-${Date.now()}`); // Use a unique name
+        currentConfig = newConfigStr;
     }
+    
+    return appInstance;
 };
 
-const app = createFirebaseApp();
-// Use initializeFirestore to avoid issues with hot-reloading
-const db = initializeFirestore(app, {
-    ignoreUndefinedProperties: true
-});
-const storage = getStorage(app);
 
-export { db, storage, createFirebaseApp };
+// Note: We are creating a function to get the db and storage instances.
+// This ensures that they are requested *after* createFirebaseApp has been called and the app is properly initialized.
+
+let dbInstance: ReturnType<typeof getFirestore> | null = null;
+let storageInstance: ReturnType<typeof getStorage> | null = null;
+
+export const getDb = () => {
+    if (!appInstance) {
+        createFirebaseApp();
+    }
+    // Use initializeFirestore to be safe against hot-reloading issues
+    if (!dbInstance) {
+        dbInstance = initializeFirestore(appInstance!, {
+            ignoreUndefinedProperties: true
+        });
+    }
+    return dbInstance;
+}
+
+export const getStorageInstance = () => {
+    if (!appInstance) {
+        createFirebaseApp();
+    }
+    if (!storageInstance) {
+        storageInstance = getStorage(appInstance!);
+    }
+    return storageInstance;
+}
+
+// Exporting db and storage directly for compatibility, but encouraging getDb/getStorageInstance
+export const db = getDb();
+export const storage = getStorageInstance();
