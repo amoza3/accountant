@@ -21,7 +21,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -63,9 +62,9 @@ const firebaseConfigSchema = z.object({
 });
 
 function ExchangeRatesForm() {
-    const { t } = useI18n();
     const { toast } = useToast();
   const { db } = useAppContext();
+  const { t } = useI18n();
   const form = useForm<z.infer<typeof exchangeRatesSchema>>({
     resolver: zodResolver(exchangeRatesSchema),
     defaultValues: {
@@ -86,12 +85,12 @@ function ExchangeRatesForm() {
     if (!db) return;
     try {
       await db.saveExchangeRates(data.rates as ExchangeRate[]);
-      toast({ title: 'موفق', description: 'نرخ‌های ارز با موفقیت ذخیره شدند.' });
+      toast({ title: t('settings.exchange_rates.toasts.success.title'), description: t('settings.exchange_rates.toasts.success.description') });
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'ذخیره نرخ‌های ارز ناموفق بود.',
+        title: t('settings.exchange_rates.toasts.error.title'),
+        description: t('settings.exchange_rates.toasts.error.description'),
       });
     }
   };
@@ -106,7 +105,7 @@ function ExchangeRatesForm() {
             name={`rates.${index}.rate`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>نرخ تبدیل {rate.currency} به تومان</FormLabel>
+                <FormLabel>{t('settings.exchange_rates.form.label', { currency: rate.currency })}</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
@@ -116,7 +115,7 @@ function ExchangeRatesForm() {
           />
         ))}
         <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-          ذخیره نرخ‌ها
+          {t('settings.exchange_rates.form.save_button')}
         </Button>
       </form>
     </Form>
@@ -124,6 +123,7 @@ function ExchangeRatesForm() {
 }
 
 function CostTitlesForm() {
+  const { t } = useI18n();
   const { toast } = useToast();
   const { db } = useAppContext();
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
@@ -147,14 +147,14 @@ function CostTitlesForm() {
     try {
       const newTitle = { id: Date.now().toString(), title: data.title };
       await db.addCostTitle(newTitle);
-      toast({ title: 'موفق', description: 'عنوان هزینه جدید اضافه شد.' });
+      toast({ title: t('settings.cost_titles.toasts.success_add.title'), description: t('settings.cost_titles.toasts.success_add.description') });
       form.reset();
       fetchCostTitles();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'افزودن عنوان هزینه ناموفق بود.',
+        title: t('settings.cost_titles.toasts.error_add.title'),
+        description: t('settings.cost_titles.toasts.error_add.description'),
       });
     }
   };
@@ -163,13 +163,13 @@ function CostTitlesForm() {
     if (!db) return;
     try {
       await db.deleteCostTitle(id);
-      toast({ title: 'موفق', description: 'عنوان هزینه حذف شد.' });
+      toast({ title: t('settings.cost_titles.toasts.success_delete.title'), description: t('settings.cost_titles.toasts.success_delete.description') });
       fetchCostTitles();
     } catch (error) {
        toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'حذف عنوان هزینه ناموفق بود.',
+        title: t('settings.cost_titles.toasts.error_delete.title'),
+        description: t('settings.cost_titles.toasts.error_delete.description'),
       });
     }
   };
@@ -183,21 +183,21 @@ function CostTitlesForm() {
             name="title"
             render={({ field }) => (
               <FormItem className="flex-grow">
-                <FormLabel>عنوان هزینه جدید</FormLabel>
+                <FormLabel>{t('settings.cost_titles.form.new_title_label')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="مثال: هزینه حمل" {...field} />
+                  <Input placeholder={t('settings.cost_titles.form.new_title_placeholder')} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
           <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            <PlusCircle className="mr-2" /> افزودن
+            <PlusCircle className="mr-2" /> {t('settings.cost_titles.form.add_button')}
           </Button>
         </form>
       </Form>
       <div className="space-y-2">
-        <h3 className="font-medium">عناوین هزینه‌های موجود</h3>
+        <h3 className="font-medium">{t('settings.cost_titles.existing_titles_label')}</h3>
         {costTitles.length > 0 ? (
           <ul className="rounded-md border">
             {costTitles.map((item) => (
@@ -210,7 +210,7 @@ function CostTitlesForm() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">هیچ عنوان هزینه‌ای تعریف نشده است.</p>
+          <p className="text-sm text-muted-foreground">{t('settings.cost_titles.no_titles_message')}</p>
         )}
       </div>
     </div>
@@ -218,6 +218,7 @@ function CostTitlesForm() {
 }
 
 function EmployeeForm() {
+  const { t } = useI18n();
   const { toast } = useToast();
   const { db } = useAppContext();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -240,14 +241,14 @@ function EmployeeForm() {
     if (!db) return;
     try {
       await db.addEmployee(data);
-      toast({ title: 'موفق', description: 'کارمند جدید اضافه شد.' });
+      toast({ title: t('settings.employees.toasts.success_add.title'), description: t('settings.employees.toasts.success_add.description') });
       form.reset();
       fetchEmployees();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'افزودن کارمند ناموفق بود.',
+        title: t('settings.employees.toasts.error_add.title'),
+        description: t('settings.employees.toasts.error_add.description'),
       });
     }
   };
@@ -256,13 +257,13 @@ function EmployeeForm() {
     if (!db) return;
     try {
       await db.deleteEmployee(id);
-      toast({ title: 'موفق', description: 'کارمند حذف شد.' });
+      toast({ title: t('settings.employees.toasts.success_delete.title'), description: t('settings.employees.toasts.success_delete.description') });
       fetchEmployees();
     } catch (error) {
        toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'حذف کارمند ناموفق بود.',
+        title: t('settings.employees.toasts.error_delete.title'),
+        description: t('settings.employees.toasts.error_delete.description'),
       });
     }
   };
@@ -271,16 +272,16 @@ function EmployeeForm() {
     <div className="space-y-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 border rounded-md">
-           <h3 className="text-lg font-medium">افزودن کارمند جدید</h3>
+           <h3 className="text-lg font-medium">{t('settings.employees.add_form.title')}</h3>
            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>نام کارمند</FormLabel>
+                        <FormLabel>{t('settings.employees.add_form.name_label')}</FormLabel>
                         <FormControl>
-                        <Input placeholder="نام کامل" {...field} />
+                        <Input placeholder={t('settings.employees.add_form.name_placeholder')} {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -291,9 +292,9 @@ function EmployeeForm() {
                     name="position"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>سمت</FormLabel>
+                        <FormLabel>{t('settings.employees.add_form.position_label')}</FormLabel>
                         <FormControl>
-                        <Input placeholder="مثال: فروشنده" {...field} />
+                        <Input placeholder={t('settings.employees.add_form.position_placeholder')} {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -304,9 +305,9 @@ function EmployeeForm() {
                     name="salary"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>حقوق ماهانه (تومان)</FormLabel>
+                        <FormLabel>{t('settings.employees.add_form.salary_label')}</FormLabel>
                         <FormControl>
-                        <Input type="number" placeholder="10,000,000" {...field} />
+                        <Input type="number" placeholder={t('settings.employees.add_form.salary_placeholder')} {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -314,12 +315,12 @@ function EmployeeForm() {
                 />
            </div>
           <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            <PlusCircle className="mr-2" /> افزودن کارمند
+            <PlusCircle className="mr-2" /> {t('settings.employees.add_form.add_button')}
           </Button>
         </form>
       </Form>
       <div className="space-y-2">
-        <h3 className="font-medium">لیست کارمندان</h3>
+        <h3 className="font-medium">{t('settings.employees.list.title')}</h3>
         {employees.length > 0 ? (
           <ul className="rounded-md border">
             {employees.map((item) => (
@@ -343,7 +344,7 @@ function EmployeeForm() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground text-center p-4">هیچ کارمندی ثبت نشده است.</p>
+          <p className="text-sm text-muted-foreground text-center p-4">{t('settings.employees.list.no_employees')}</p>
         )}
       </div>
     </div>
@@ -351,48 +352,53 @@ function EmployeeForm() {
 }
 
 function StorageSettingsForm() {
+    const { t } = useI18n();
     const { toast } = useToast();
     const { storageType, changeStorageType } = useAppContext();
 
     const handleStorageChange = (value: StorageType) => {
         changeStorageType(value);
         toast({
-            title: 'موفق',
-            description: `حالت ذخیره‌سازی به ${value === 'cloud' ? 'ابری' : 'محلی'} تغییر کرد. صفحه مجددا بارگذاری می‌شود.`,
+            title: t('settings.data_storage.toasts.success.title'),
+            description: t('settings.data_storage.toasts.success.description', {
+                storage: value === 'cloud' ? t('settings.data_storage.form.cloud') : t('settings.data_storage.form.local')
+            }),
         });
         window.location.reload();
     }
 
     return (
         <div className="space-y-4">
-            <Label>محل ذخیره‌سازی داده‌ها</Label>
+            <Label>{t('settings.data_storage.form.label')}</Label>
             <Select value={storageType} onValueChange={handleStorageChange}>
                 <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="انتخاب کنید" />
+                    <SelectValue placeholder={t('settings.data_storage.form.placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="local">محلی (مرورگر)</SelectItem>
-                    <SelectItem value="cloud">ابری (Firestore)</SelectItem>
+                    <SelectItem value="local">{t('settings.data_storage.form.local')}</SelectItem>
+                    <SelectItem value="cloud">{t('settings.data_storage.form.cloud')}</SelectItem>
                 </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">
-                داده‌های شما در حال حاضر در "{storageType === 'local' ? 'مرورگر شما (Local)' : 'فضای ابری (Cloud)'}" ذخیره می‌شود.
+                {t('settings.data_storage.form.description')}
             </p>
         </div>
     );
 }
 
-function FirebaseSettingsForm() {
-    const { toast } = useToast();
-    const defaultConfig: FirebaseConfig = {
-        projectId: 'easystock-wlf7q',
-        appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
-        storageBucket: 'easystock-wlf7q.appspot.com',
-        apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
-        authDomain: 'easystock-wlf7q.firebaseapp.com',
-        messagingSenderId: '757179151003',
-    };
+const defaultConfig: FirebaseConfig = {
+    projectId: 'easystock-wlf7q',
+    appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
+    storageBucket: 'easystock-wlf7q.appspot.com',
+    apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
+    authDomain: 'easystock-wlf7q.firebaseapp.com',
+    messagingSenderId: '757179151003',
+};
 
+function FirebaseSettingsForm() {
+    const { t } = useI18n();
+    const { toast } = useToast();
+    
     const form = useForm<FirebaseConfig>({
         resolver: zodResolver(firebaseConfigSchema),
         defaultValues: defaultConfig,
@@ -405,14 +411,15 @@ function FirebaseSettingsForm() {
         } else {
             form.reset(defaultConfig);
         }
-    }, [form, defaultConfig]);
+    }, [form]);
 
     const onSubmit = (data: FirebaseConfig) => {
         localStorage.setItem('firebaseConfig', JSON.stringify(data));
         toast({
-            title: 'موفق',
-            description: 'تنظیمات Firebase ذخیره شد. برای اعمال تغییرات، صفحه مجددا بارگذاری می‌شود.'
+            title: t('settings.firebase.toasts.success.title'),
+            description: t('settings.firebase.toasts.success.description')
         });
+        // Optionally, force a reload to apply the new config
         setTimeout(() => window.location.reload(), 1500);
     };
 
@@ -461,7 +468,7 @@ function FirebaseSettingsForm() {
                         <FormMessage />
                     </FormItem>
                 )} />
-                <Button type="submit">ذخیره تغییرات</Button>
+                <Button type="submit">{t('common.save_changes')}</Button>
             </form>
         </Form>
     );

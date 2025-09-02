@@ -387,17 +387,18 @@ function StorageSettingsForm() {
     );
 }
 
+const defaultConfig: FirebaseConfig = {
+    projectId: 'easystock-wlf7q',
+    appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
+    storageBucket: 'easystock-wlf7q.appspot.com',
+    apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
+    authDomain: 'easystock-wlf7q.firebaseapp.com',
+    messagingSenderId: '757179151003',
+};
+
 function FirebaseSettingsForm() {
     const { t } = useI18n();
     const { toast } = useToast();
-    const defaultConfig: FirebaseConfig = {
-        projectId: 'easystock-wlf7q',
-        appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
-        storageBucket: 'easystock-wlf7q.appspot.com',
-        apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
-        authDomain: 'easystock-wlf7q.firebaseapp.com',
-        messagingSenderId: '757179151003',
-    };
     
     const form = useForm<FirebaseConfig>({
         resolver: zodResolver(firebaseConfigSchema),
@@ -411,7 +412,7 @@ function FirebaseSettingsForm() {
         } else {
             form.reset(defaultConfig);
         }
-    }, [form]);
+    }, [form.reset]);
 
     const onSubmit = (data: FirebaseConfig) => {
         localStorage.setItem('firebaseConfig', JSON.stringify(data));
