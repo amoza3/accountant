@@ -21,11 +21,12 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 
-import type { ExchangeRate, CostTitle, Employee } from '@/lib/types';
+import type { ExchangeRate, CostTitle, Employee, FirebaseConfig } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useI18n } from '@/lib/i18n/client';
 import { useAppContext } from '@/components/app-provider';
@@ -51,6 +52,15 @@ const employeeSchema = z.object({
   name: z.string().min(1, 'نام کارمند الزامی است'),
   position: z.string().min(1, 'سمت الزامی است'),
   salary: z.coerce.number().min(0, 'حقوق نمی‌تواند منفی باشد'),
+});
+
+const firebaseConfigSchema = z.object({
+  apiKey: z.string().min(1, 'API Key is required'),
+  authDomain: z.string().min(1, 'Auth Domain is required'),
+  projectId: z.string().min(1, 'Project ID is required'),
+  storageBucket: z.string().min(1, 'Storage Bucket is required'),
+  messagingSenderId: z.string().min(1, 'Messaging Sender ID is required'),
+  appId: z.string().min(1, 'App ID is required'),
 });
 
 function ExchangeRatesForm() {
@@ -378,6 +388,88 @@ function StorageSettingsForm() {
     );
 }
 
+function FirebaseSettingsForm() {
+    const { t } = useI18n();
+    const { toast } = useToast();
+    const form = useForm<FirebaseConfig>({
+        resolver: zodResolver(firebaseConfigSchema),
+        defaultValues: {
+            apiKey: '',
+            authDomain: '',
+            projectId: '',
+            storageBucket: '',
+            messagingSenderId: '',
+            appId: ''
+        }
+    });
+
+    useEffect(() => {
+        const savedConfig = localStorage.getItem('firebaseConfig');
+        if (savedConfig) {
+            form.reset(JSON.parse(savedConfig));
+        }
+    }, [form]);
+
+    const onSubmit = (data: FirebaseConfig) => {
+        localStorage.setItem('firebaseConfig', JSON.stringify(data));
+        toast({
+            title: t('settings.firebase.toasts.success.title'),
+            description: t('settings.firebase.toasts.success.description')
+        });
+        // Optionally, force a reload to apply the new config
+        window.location.reload();
+    };
+
+    return (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField control={form.control} name="projectId" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Project ID</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                 <FormField control={form.control} name="appId" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>App ID</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                 <FormField control={form.control} name="apiKey" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>API Key</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="authDomain" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Auth Domain</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="storageBucket" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Storage Bucket</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                 <FormField control={form.control} name="messagingSenderId" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Messaging Sender ID</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <Button type="submit">{t('common.save_changes')}</Button>
+            </form>
+        </Form>
+    );
+}
 
 export default function SettingsPage() {
   const { t } = useI18n();
@@ -385,8 +477,9 @@ export default function SettingsPage() {
     <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">{t('settings.title')}</h1>
       <Tabs defaultValue="exchange-rates">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="data-storage">{t('settings.data_storage.tab')}</TabsTrigger>
+          <TabsTrigger value="firebase-config">{t('settings.firebase.tab')}</TabsTrigger>
           <TabsTrigger value="exchange-rates">{t('settings.exchange_rates.tab')}</TabsTrigger>
           <TabsTrigger value="cost-titles">{t('settings.cost_titles.tab')}</TabsTrigger>
           <TabsTrigger value="employees">{t('settings.employees.tab')}</TabsTrigger>
@@ -401,6 +494,19 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <StorageSettingsForm />
+                </CardContent>
+            </Card>
+        </TabsContent>
+         <TabsContent value="firebase-config">
+            <Card>
+                <CardHeader>
+                <CardTitle>{t('settings.firebase.title')}</CardTitle>
+                <CardDescription>
+                    {t('settings.firebase.description')}
+                </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <FirebaseSettingsForm />
                 </CardContent>
             </Card>
         </TabsContent>

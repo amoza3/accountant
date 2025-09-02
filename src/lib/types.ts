@@ -97,3 +97,12 @@ export interface RecurringExpense {
   startDate: string; // ISO date string
   lastAppliedDate?: string; // ISO date string
 }
+
+export interface FirebaseConfig {
+    apiKey: string;
+    authDomain: string;
+    projectId: string;
+    storageBucket: string;
+    messagingSenderId: string;
+    appId: string;
+}

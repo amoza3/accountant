@@ -395,6 +395,15 @@ const getExchangeRates = (): Promise<ExchangeRate[]> => {
     });
 };
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
 export const IndexedDBDataProvider: DataProvider = {
   addProduct,
   getAllProducts,
@@ -642,4 +651,9 @@ export const IndexedDBDataProvider: DataProvider = {
   getAttachmentsBySourceId,
   addPayment,
   getPaymentsByIds,
+  uploadFile: async (file) => {
+    // For IndexedDB, we'll just convert the file to a Base64 string as a fallback.
+    // This is not efficient for large files and is a limitation of client-side only storage.
+    return fileToBase64(file);
+  },
 };

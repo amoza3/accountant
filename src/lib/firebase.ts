@@ -11,7 +11,7 @@ const createFirebaseApp = () => {
     const defaultConfig: FirebaseOptions = {
         projectId: 'easystock-wlf7q',
         appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
-        storageBucket: 'easystock-wlf7q.firebasestorage.app',
+        storageBucket: 'easystock-wlf7q.appspot.com',
         apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
         authDomain: 'easystock-wlf7q.firebaseapp.com',
         messagingSenderId: '757179151003',
