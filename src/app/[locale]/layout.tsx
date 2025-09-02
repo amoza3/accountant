@@ -3,7 +3,7 @@ import { MainSidebar } from '@/components/layout/main-sidebar';
 import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { PanelLeft } from 'lucide-react';
 import { getI18n } from '@/lib/i18n/server';
-
+import { FirebaseStatusIndicator } from '@/components/layout/firebase-status-indicator';
 
 export default async function DashboardLayout({ children, params: { locale } }: { children: ReactNode, params: { locale: string } }) {
   const { t } = await getI18n(locale);
@@ -21,6 +21,7 @@ export default async function DashboardLayout({ children, params: { locale } }: 
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
           {children}
         </main>
+        <FirebaseStatusIndicator />
       </SidebarInset>
     </div>
   );

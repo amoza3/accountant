@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { MainSidebar } from '@/components/layout/main-sidebar';
 import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { PanelLeft } from 'lucide-react';
+import { FirebaseStatusIndicator } from '@/components/layout/firebase-status-indicator';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     const appName = "ایزی استاک";
@@ -18,6 +19,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
           {children}
         </main>
+        <FirebaseStatusIndicator />
       </SidebarInset>
     </div>
   );

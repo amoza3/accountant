@@ -21,49 +21,51 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
+import { useI18n } from '@/lib/i18n/client';
 
 export function MainSidebar({ appName }: { appName: string }) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   const menuItems = [
     {
       href: `/dashboard`,
-      label: 'موجودی',
+      label: t('sidebar.inventory'),
       icon: LayoutDashboard,
     },
     {
       href: `/dashboard/add-product`,
-      label: 'افزودن محصول',
+      label: t('sidebar.add_product'),
       icon: PlusCircle,
     },
     {
       href: `/dashboard/record-sale`,
-      label: 'ثبت فروش',
+      label: t('sidebar.record_sale'),
       icon: ShoppingCart,
     },
      {
       href: `/dashboard/sales-history`,
-      label: 'تاریخچه فروش',
+      label: t('sidebar.sales_history'),
       icon: History,
     },
     {
         href: `/dashboard/customers`,
-        label: 'مشتریان',
+        label: t('sidebar.customers'),
         icon: Users,
     },
     {
       href: `/dashboard/expenses`,
-      label: 'مخارج',
+      label: t('sidebar.expenses'),
       icon: Receipt,
     },
     {
       href: `/dashboard/reports`,
-      label: 'گزارش‌ها',
+      label: t('sidebar.reports'),
       icon: FileText,
     },
     {
       href: `/dashboard/settings`,
-      label: 'تنظیمات',
+      label: t('sidebar.settings'),
       icon: Settings,
     }
   ];
@@ -71,10 +73,11 @@ export function MainSidebar({ appName }: { appName: string }) {
   const isLinkActive = (href: string) => {
     // Exact match for dashboard
     if (href.endsWith('/dashboard')) {
-      return pathname === href || pathname === '/';
+      const currentPath = pathname.substring(pathname.indexOf('/dashboard'));
+      return currentPath === href;
     }
     // Starts with for sub-pages
-    return pathname.startsWith(href);
+    return pathname.includes(href);
   };
   
   return (
