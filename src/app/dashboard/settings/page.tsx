@@ -32,6 +32,7 @@ import { useI18n } from '@/lib/i18n/client';
 import { useAppContext } from '@/components/app-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { StorageType } from '@/hooks/use-db';
+import { Label } from '@/components/ui/label';
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -76,12 +77,12 @@ function ExchangeRatesForm() {
     if (!db) return;
     try {
       await db.saveExchangeRates(data.rates as ExchangeRate[]);
-      toast({ title: t('settings.exchange_rates.toasts.success.title'), description: t('settings.exchange_rates.toasts.success.description') });
+      toast({ title: 'نرخ‌ها ذخیره شد', description: 'نرخ‌های جدید ارز با موفقیت ذخیره شدند.' });
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: t('settings.exchange_rates.toasts.error.title'),
-        description: t('settings.exchange_rates.toasts.error.description'),
+        title: 'خطا',
+        description: 'ذخیره نرخ‌های ارز ناموفق بود.',
       });
     }
   };
@@ -96,7 +97,7 @@ function ExchangeRatesForm() {
             name={`rates.${index}.rate`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t('settings.exchange_rates.form.label', { currency: rate.currency })}</FormLabel>
+                <FormLabel>{`نرخ ${rate.currency} به تومان`}</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
@@ -106,7 +107,7 @@ function ExchangeRatesForm() {
           />
         ))}
         <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-          {t('settings.exchange_rates.form.save_button')}
+          ذخیره نرخ‌ها
         </Button>
       </form>
     </Form>
@@ -138,14 +139,14 @@ function CostTitlesForm() {
     try {
       const newTitle = { id: Date.now().toString(), title: data.title };
       await db.addCostTitle(newTitle);
-      toast({ title: t('settings.cost_titles.toasts.success_add.title'), description: t('settings.cost_titles.toasts.success_add.description') });
+      toast({ title: 'عنوان جدید اضافه شد', description: 'عنوان هزینه جدید با موفقیت اضافه شد.' });
       form.reset();
       fetchCostTitles();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: t('settings.cost_titles.toasts.error_add.title'),
-        description: t('settings.cost_titles.toasts.error_add.description'),
+        title: 'خطا',
+        description: 'افزودن عنوان هزینه ناموفق بود.',
       });
     }
   };
@@ -154,13 +155,13 @@ function CostTitlesForm() {
     if (!db) return;
     try {
       await db.deleteCostTitle(id);
-      toast({ title: t('settings.cost_titles.toasts.success_delete.title'), description: t('settings.cost_titles.toasts.success_delete.description') });
+      toast({ title: 'عنوان هزینه حذف شد', description: 'عنوان هزینه با موفقیت حذف شد.' });
       fetchCostTitles();
     } catch (error) {
        toast({
         variant: 'destructive',
-        title: t('settings.cost_titles.toasts.error_delete.title'),
-        description: t('settings.cost_titles.toasts.error_delete.description'),
+        title: 'خطا',
+        description: 'حذف عنوان هزینه ناموفق بود.',
       });
     }
   };
@@ -174,21 +175,21 @@ function CostTitlesForm() {
             name="title"
             render={({ field }) => (
               <FormItem className="flex-grow">
-                <FormLabel>{t('settings.cost_titles.form.new_title_label')}</FormLabel>
+                <FormLabel>عنوان هزینه جدید</FormLabel>
                 <FormControl>
-                  <Input placeholder={t('settings.cost_titles.form.new_title_placeholder')} {...field} />
+                  <Input placeholder="مثال: هزینه حمل" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
           <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            <PlusCircle className="mr-2" /> {t('settings.cost_titles.form.add_button')}
+            <PlusCircle className="mr-2" /> افزودن
           </Button>
         </form>
       </Form>
       <div className="space-y-2">
-        <h3 className="font-medium">{t('settings.cost_titles.existing_titles_label')}</h3>
+        <h3 className="font-medium">عناوین هزینه موجود</h3>
         {costTitles.length > 0 ? (
           <ul className="rounded-md border">
             {costTitles.map((item) => (
@@ -201,7 +202,7 @@ function CostTitlesForm() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">{t('settings.cost_titles.no_titles_message')}</p>
+          <p className="text-sm text-muted-foreground">هیچ عنوان هزینه‌ای یافت نشد.</p>
         )}
       </div>
     </div>
@@ -209,7 +210,6 @@ function CostTitlesForm() {
 }
 
 function EmployeeForm() {
-  const { t } = useI18n();
   const { toast } = useToast();
   const { db } = useAppContext();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -232,14 +232,14 @@ function EmployeeForm() {
     if (!db) return;
     try {
       await db.addEmployee(data);
-      toast({ title: t('settings.employees.toasts.success_add.title'), description: t('settings.employees.toasts.success_add.description') });
+      toast({ title: 'کارمند اضافه شد', description: 'کارمند جدید با موفقیت اضافه شد.' });
       form.reset();
       fetchEmployees();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: t('settings.employees.toasts.error_add.title'),
-        description: t('settings.employees.toasts.error_add.description'),
+        title: 'خطا',
+        description: 'افزودن کارمند ناموفق بود.',
       });
     }
   };
@@ -248,13 +248,13 @@ function EmployeeForm() {
     if (!db) return;
     try {
       await db.deleteEmployee(id);
-      toast({ title: t('settings.employees.toasts.success_delete.title'), description: t('settings.employees.toasts.success_delete.description') });
+      toast({ title: 'کارمند حذف شد', description: 'کارمند با موفقیت حذف شد.' });
       fetchEmployees();
     } catch (error) {
        toast({
         variant: 'destructive',
-        title: t('settings.employees.toasts.error_delete.title'),
-        description: t('settings.employees.toasts.error_delete.description'),
+        title: 'خطا',
+        description: 'حذف کارمند ناموفق بود.',
       });
     }
   };
@@ -263,16 +263,16 @@ function EmployeeForm() {
     <div className="space-y-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 border rounded-md">
-           <h3 className="text-lg font-medium">{t('settings.employees.add_form.title')}</h3>
+           <h3 className="text-lg font-medium">افزودن کارمند جدید</h3>
            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>{t('settings.employees.add_form.name_label')}</FormLabel>
+                        <FormLabel>نام کامل</FormLabel>
                         <FormControl>
-                        <Input placeholder={t('settings.employees.add_form.name_placeholder')} {...field} />
+                        <Input placeholder="مثال: علی رضایی" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -283,9 +283,9 @@ function EmployeeForm() {
                     name="position"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>{t('settings.employees.add_form.position_label')}</FormLabel>
+                        <FormLabel>سمت</FormLabel>
                         <FormControl>
-                        <Input placeholder={t('settings.employees.add_form.position_placeholder')} {...field} />
+                        <Input placeholder="مثال: فروشنده" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -296,9 +296,9 @@ function EmployeeForm() {
                     name="salary"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>{t('settings.employees.add_form.salary_label')}</FormLabel>
+                        <FormLabel>حقوق ماهانه (تومان)</FormLabel>
                         <FormControl>
-                        <Input type="number" placeholder={t('settings.employees.add_form.salary_placeholder')} {...field} />
+                        <Input type="number" placeholder="10,000,000" {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -306,12 +306,12 @@ function EmployeeForm() {
                 />
            </div>
           <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            <PlusCircle className="mr-2" /> {t('settings.employees.add_form.add_button')}
+            <PlusCircle className="mr-2" /> افزودن کارمند
           </Button>
         </form>
       </Form>
       <div className="space-y-2">
-        <h3 className="font-medium">{t('settings.employees.list.title')}</h3>
+        <h3 className="font-medium">لیست کارمندان</h3>
         {employees.length > 0 ? (
           <ul className="rounded-md border">
             {employees.map((item) => (
@@ -335,7 +335,7 @@ function EmployeeForm() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground text-center p-4">{t('settings.employees.list.no_employees')}</p>
+          <p className="text-sm text-muted-foreground text-center p-4">هنوز کارمندی ثبت نشده است.</p>
         )}
       </div>
     </div>
@@ -343,60 +343,55 @@ function EmployeeForm() {
 }
 
 function StorageSettingsForm() {
-    const { t } = useI18n();
     const { toast } = useToast();
     const { storageType, changeStorageType } = useAppContext();
 
     const handleStorageChange = (value: StorageType) => {
         changeStorageType(value);
         toast({
-            title: t('settings.data_storage.toasts.success.title'),
-            description: t('settings.data_storage.toasts.success.description', {
-                storage: value === 'cloud' ? t('settings.data_storage.form.cloud') : t('settings.data_storage.form.local')
-            }),
+            title: 'محل ذخیره‌سازی تغییر کرد',
+            description: `داده‌ها اکنون در ${value === 'cloud' ? 'فضای ابری (Firestore)' : 'مرورگر شما'} ذخیره می‌شوند.`,
         });
-        // Note: You might want to reload the app or force a data re-fetch here
         window.location.reload();
     }
 
     return (
         <div className="space-y-4">
-            <FormLabel>{t('settings.data_storage.form.label')}</FormLabel>
+            <Label>محل ذخیره‌سازی داده‌ها</Label>
             <Select value={storageType} onValueChange={handleStorageChange}>
                 <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder={t('settings.data_storage.form.placeholder')} />
+                    <SelectValue placeholder="انتخاب محل ذخیره‌سازی" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="local">{t('settings.data_storage.form.local')}</SelectItem>
-                    <SelectItem value="cloud">{t('settings.data_storage.form.cloud')}</SelectItem>
+                    <SelectItem value="local">محلی (مرورگر)</SelectItem>
+                    <SelectItem value="cloud">ابری (Firestore)</SelectItem>
                 </SelectContent>
             </Select>
-            <FormDescription>
-                {t('settings.data_storage.form.description')}
-            </FormDescription>
+            <p className="text-sm text-muted-foreground">
+                با انتخاب "ابری"، داده‌های شما در Firebase Firestore ذخیره می‌شوند و از هر دستگاهی قابل دسترس خواهند بود.
+            </p>
         </div>
     );
 }
 
 
 export default function SettingsPage() {
-  const { t } = useI18n();
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">{t('settings.title')}</h1>
+      <h1 className="text-3xl font-bold mb-6">تنظیمات</h1>
       <Tabs defaultValue="exchange-rates">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="data-storage">{t('settings.data_storage.tab')}</TabsTrigger>
-          <TabsTrigger value="exchange-rates">{t('settings.exchange_rates.tab')}</TabsTrigger>
-          <TabsTrigger value="cost-titles">{t('settings.cost_titles.tab')}</TabsTrigger>
-          <TabsTrigger value="employees">{t('settings.employees.tab')}</TabsTrigger>
+          <TabsTrigger value="data-storage">ذخیره‌سازی داده</TabsTrigger>
+          <TabsTrigger value="exchange-rates">نرخ ارز</TabsTrigger>
+          <TabsTrigger value="cost-titles">عناوین هزینه</TabsTrigger>
+          <TabsTrigger value="employees">کارمندان</TabsTrigger>
         </TabsList>
          <TabsContent value="data-storage">
             <Card>
                 <CardHeader>
-                <CardTitle>{t('settings.data_storage.title')}</CardTitle>
+                <CardTitle>ذخیره‌سازی داده‌ها</CardTitle>
                 <CardDescription>
-                    {t('settings.data_storage.description')}
+                    محل ذخیره‌سازی اطلاعات برنامه خود را انتخاب کنید.
                 </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -407,9 +402,9 @@ export default function SettingsPage() {
         <TabsContent value="exchange-rates">
           <Card>
             <CardHeader>
-              <CardTitle>{t('settings.exchange_rates.title')}</CardTitle>
+              <CardTitle>نرخ ارز</CardTitle>
               <CardDescription>
-                {t('settings.exchange_rates.description')}
+                نرخ تبدیل ارزهای دیگر به تومان را برای محاسبه قیمت تمام‌شده وارد کنید.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -420,9 +415,9 @@ export default function SettingsPage() {
         <TabsContent value="cost-titles">
           <Card>
             <CardHeader>
-              <CardTitle>{t('settings.cost_titles.title')}</CardTitle>
+              <CardTitle>عناوین هزینه</CardTitle>
               <CardDescription>
-                {t('settings.cost_titles.description')}
+                عناوین هزینه‌های متداول خود را برای دسترسی سریع‌تر تعریف کنید.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -433,9 +428,9 @@ export default function SettingsPage() {
          <TabsContent value="employees">
           <Card>
             <CardHeader>
-              <CardTitle>{t('settings.employees.title')}</CardTitle>
+              <CardTitle>مدیریت کارمندان</CardTitle>
               <CardDescription>
-                {t('settings.employees.description')}
+                اطلاعات کارمندان و حقوق آن‌ها را برای محاسبه خودکار در هزینه‌ها وارد کنید.
               </CardDescription>
             </CardHeader>
             <CardContent>

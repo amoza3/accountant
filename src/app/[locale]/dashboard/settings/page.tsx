@@ -21,7 +21,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +31,8 @@ import { useI18n } from '@/lib/i18n/client';
 import { useAppContext } from '@/components/app-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { StorageType } from '@/hooks/use-db';
+import { Label } from '@/components/ui/label';
+
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -360,7 +361,7 @@ function StorageSettingsForm() {
 
     return (
         <div className="space-y-4">
-            <FormLabel>{t('settings.data_storage.form.label')}</FormLabel>
+            <Label>{t('settings.data_storage.form.label')}</Label>
             <Select value={storageType} onValueChange={handleStorageChange}>
                 <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder={t('settings.data_storage.form.placeholder')} />
@@ -370,9 +371,9 @@ function StorageSettingsForm() {
                     <SelectItem value="cloud">{t('settings.data_storage.form.cloud')}</SelectItem>
                 </SelectContent>
             </Select>
-            <FormDescription>
+            <p className="text-sm text-muted-foreground">
                 {t('settings.data_storage.form.description')}
-            </FormDescription>
+            </p>
         </div>
     );
 }
