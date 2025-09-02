@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,6 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -134,15 +133,15 @@ function CostTitlesForm() {
     defaultValues: { title: '' },
   });
 
-  const fetchCostTitles = async () => {
+  const fetchCostTitles = useCallback(async () => {
     if (!db) return;
     const titles = await db.getCostTitles();
     setCostTitles(titles);
-  };
+  }, [db]);
 
   useEffect(() => {
     fetchCostTitles();
-  }, [db]);
+  }, [fetchCostTitles]);
 
   const onSubmit = async (data: z.infer<typeof costTitleSchema>) => {
     if (!db) return;
@@ -229,15 +228,15 @@ function EmployeeForm() {
     defaultValues: { name: '', position: '', salary: 0 },
   });
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     if (!db) return;
     const allEmployees = await db.getAllEmployees();
     setEmployees(allEmployees);
-  };
+  }, [db]);
 
   useEffect(() => {
     fetchEmployees();
-  }, [db]);
+  }, [fetchEmployees]);
 
   const onSubmit = async (data: z.infer<typeof employeeSchema>) => {
     if (!db) return;
@@ -391,22 +390,26 @@ function StorageSettingsForm() {
 function FirebaseSettingsForm() {
     const { t } = useI18n();
     const { toast } = useToast();
+    const defaultConfig: FirebaseConfig = {
+        projectId: 'easystock-wlf7q',
+        appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
+        storageBucket: 'easystock-wlf7q.appspot.com',
+        apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
+        authDomain: 'easystock-wlf7q.firebaseapp.com',
+        messagingSenderId: '757179151003',
+    };
+    
     const form = useForm<FirebaseConfig>({
         resolver: zodResolver(firebaseConfigSchema),
-        defaultValues: {
-            apiKey: '',
-            authDomain: '',
-            projectId: '',
-            storageBucket: '',
-            messagingSenderId: '',
-            appId: ''
-        }
+        defaultValues: defaultConfig,
     });
 
     useEffect(() => {
         const savedConfig = localStorage.getItem('firebaseConfig');
         if (savedConfig) {
             form.reset(JSON.parse(savedConfig));
+        } else {
+            form.reset(defaultConfig);
         }
     }, [form]);
 
@@ -417,7 +420,7 @@ function FirebaseSettingsForm() {
             description: t('settings.firebase.toasts.success.description')
         });
         // Optionally, force a reload to apply the new config
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 1500);
     };
 
     return (
