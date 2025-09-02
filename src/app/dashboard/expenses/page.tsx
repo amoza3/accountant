@@ -483,6 +483,9 @@ function ExpenseListItem({ expense }: { expense: Expense & { attachments: Attach
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>ویرایش هزینه</DialogTitle>
+                        </DialogHeader>
                         <ExpenseForm expenseToEdit={expense} onExpenseUpdated={onUpdateSuccess} onExpenseAdded={() => {}} />
                     </DialogContent>
                 </Dialog>
@@ -597,7 +600,7 @@ export default function ExpensesPage() {
                 <TabsTrigger value="recurring"><Repeat className="w-4 h-4 ml-1" />دوره‌ای</TabsTrigger>
             </TabsList>
             <TabsContent value="one-time">
-                <ExpenseForm onExpenseAdded={fetchExpenses} />
+                <ExpenseForm onExpenseAdded={fetchExpenses} onExpenseUpdated={fetchExpenses} />
             </TabsContent>
              <TabsContent value="recurring">
                 <RecurringExpenseForm onRecurringExpenseAdded={fetchExpenses} />
