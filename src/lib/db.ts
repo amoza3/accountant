@@ -361,7 +361,7 @@ export const updateExpense = async (expense: Expense, newAttachments: Omit<Attac
         return attachmentId;
     });
 
-    const finalAttachmentIds = expense.attachmentIds
+    const finalAttachmentIds = (expense.attachmentIds || [])
       .filter(id => !deletedAttachmentIds.includes(id))
       .concat(newAttachmentIds);
 
