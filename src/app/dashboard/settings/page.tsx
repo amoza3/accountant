@@ -36,6 +36,7 @@ import {
 } from '@/lib/db';
 import type { ExchangeRate, CostTitle, Employee } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useI18n } from '@/lib/i18n/client';
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -57,6 +58,7 @@ const employeeSchema = z.object({
 });
 
 function ExchangeRatesForm() {
+  const { t } = useI18n();
   const { toast } = useToast();
   const form = useForm<z.infer<typeof exchangeRatesSchema>>({
     resolver: zodResolver(exchangeRatesSchema),
@@ -76,12 +78,12 @@ function ExchangeRatesForm() {
   const onSubmit = async (data: z.infer<typeof exchangeRatesSchema>) => {
     try {
       await saveExchangeRates(data.rates as ExchangeRate[]);
-      toast({ title: 'موفق', description: 'نرخ ارز ذخیره شد.' });
+      toast({ title: t('settings.exchange_rates.toasts.success.title'), description: t('settings.exchange_rates.toasts.success.description') });
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'ذخیره نرخ ارز ناموفق بود.',
+        title: t('settings.exchange_rates.toasts.error.title'),
+        description: t('settings.exchange_rates.toasts.error.description'),
       });
     }
   };
@@ -96,7 +98,7 @@ function ExchangeRatesForm() {
             name={`rates.${index}.rate`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{`۱ ${rate.currency} به تومان`}</FormLabel>
+                <FormLabel>{t('settings.exchange_rates.form.label', { currency: rate.currency })}</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
@@ -106,7 +108,7 @@ function ExchangeRatesForm() {
           />
         ))}
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          ذخیره نرخ ارز
+          {t('settings.exchange_rates.form.save_button')}
         </Button>
       </form>
     </Form>
@@ -114,6 +116,7 @@ function ExchangeRatesForm() {
 }
 
 function CostTitlesForm() {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
   const form = useForm<z.infer<typeof costTitleSchema>>({
@@ -134,14 +137,14 @@ function CostTitlesForm() {
     try {
       const newTitle = { id: Date.now().toString(), title: data.title };
       await addCostTitle(newTitle);
-      toast({ title: 'موفق', description: 'عنوان هزینه اضافه شد.' });
+      toast({ title: t('settings.cost_titles.toasts.success_add.title'), description: t('settings.cost_titles.toasts.success_add.description') });
       form.reset();
       fetchCostTitles();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'افزودن عنوان هزینه ناموفق بود.',
+        title: t('settings.cost_titles.toasts.error_add.title'),
+        description: t('settings.cost_titles.toasts.error_add.description'),
       });
     }
   };
@@ -149,13 +152,13 @@ function CostTitlesForm() {
   const handleDelete = async (id: string) => {
     try {
       await deleteCostTitle(id);
-      toast({ title: 'موفق', description: 'عنوان هزینه حذف شد.' });
+      toast({ title: t('settings.cost_titles.toasts.success_delete.title'), description: t('settings.cost_titles.toasts.success_delete.description') });
       fetchCostTitles();
     } catch (error) {
        toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'حذف عنوان هزینه ناموفق بود.',
+        title: t('settings.cost_titles.toasts.error_delete.title'),
+        description: t('settings.cost_titles.toasts.error_delete.description'),
       });
     }
   };
@@ -169,21 +172,21 @@ function CostTitlesForm() {
             name="title"
             render={({ field }) => (
               <FormItem className="flex-grow">
-                <FormLabel>عنوان هزینه جدید</FormLabel>
+                <FormLabel>{t('settings.cost_titles.form.new_title_label')}</FormLabel>
                 <FormControl>
-                  <Input placeholder="مثال: حمل از چین" {...field} />
+                  <Input placeholder={t('settings.cost_titles.form.new_title_placeholder')} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
           <Button type="submit" disabled={form.formState.isSubmitting}>
-            <PlusCircle className="mr-2" /> افزودن
+            <PlusCircle className="mr-2" /> {t('settings.cost_titles.form.add_button')}
           </Button>
         </form>
       </Form>
       <div className="space-y-2">
-        <h3 className="font-medium">عناوین هزینه موجود</h3>
+        <h3 className="font-medium">{t('settings.cost_titles.existing_titles_label')}</h3>
         {costTitles.length > 0 ? (
           <ul className="rounded-md border">
             {costTitles.map((item) => (
@@ -196,7 +199,7 @@ function CostTitlesForm() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">هنوز عنوان هزینه‌ای تعریف نشده است.</p>
+          <p className="text-sm text-muted-foreground">{t('settings.cost_titles.no_titles_message')}</p>
         )}
       </div>
     </div>
@@ -204,6 +207,7 @@ function CostTitlesForm() {
 }
 
 function EmployeeForm() {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const form = useForm<z.infer<typeof employeeSchema>>({
@@ -223,14 +227,14 @@ function EmployeeForm() {
   const onSubmit = async (data: z.infer<typeof employeeSchema>) => {
     try {
       await addEmployee(data);
-      toast({ title: 'موفق', description: 'کارمند جدید اضافه شد و حقوق ماهانه به هزینه‌های دوره‌ای افزوده شد.' });
+      toast({ title: t('settings.employees.toasts.success_add.title'), description: t('settings.employees.toasts.success_add.description') });
       form.reset();
       fetchEmployees();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'افزودن کارمند ناموفق بود.',
+        title: t('settings.employees.toasts.error_add.title'),
+        description: t('settings.employees.toasts.error_add.description'),
       });
     }
   };
@@ -238,13 +242,13 @@ function EmployeeForm() {
   const handleDelete = async (id: string) => {
     try {
       await deleteEmployee(id);
-      toast({ title: 'موفق', description: 'کارمند و هزینه حقوق مربوطه حذف شد.' });
+      toast({ title: t('settings.employees.toasts.success_delete.title'), description: t('settings.employees.toasts.success_delete.description') });
       fetchEmployees();
     } catch (error) {
        toast({
         variant: 'destructive',
-        title: 'خطا',
-        description: 'حذف کارمند ناموفق بود.',
+        title: t('settings.employees.toasts.error_delete.title'),
+        description: t('settings.employees.toasts.error_delete.description'),
       });
     }
   };
@@ -253,16 +257,16 @@ function EmployeeForm() {
     <div className="space-y-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-4 border rounded-md">
-           <h3 className="text-lg font-medium">افزودن کارمند جدید</h3>
+           <h3 className="text-lg font-medium">{t('settings.employees.add_form.title')}</h3>
            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>نام کامل</FormLabel>
+                        <FormLabel>{t('settings.employees.add_form.name_label')}</FormLabel>
                         <FormControl>
-                        <Input placeholder="نام کارمند" {...field} />
+                        <Input placeholder={t('settings.employees.add_form.name_placeholder')} {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -273,9 +277,9 @@ function EmployeeForm() {
                     name="position"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>سمت</FormLabel>
+                        <FormLabel>{t('settings.employees.add_form.position_label')}</FormLabel>
                         <FormControl>
-                        <Input placeholder="مثال: فروشنده" {...field} />
+                        <Input placeholder={t('settings.employees.add_form.position_placeholder')} {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -286,9 +290,9 @@ function EmployeeForm() {
                     name="salary"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>حقوق ماهانه (تومان)</FormLabel>
+                        <FormLabel>{t('settings.employees.add_form.salary_label')}</FormLabel>
                         <FormControl>
-                        <Input type="number" placeholder="10,000,000" {...field} />
+                        <Input type="number" placeholder={t('settings.employees.add_form.salary_placeholder')} {...field} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -296,12 +300,12 @@ function EmployeeForm() {
                 />
            </div>
           <Button type="submit" disabled={form.formState.isSubmitting}>
-            <PlusCircle className="mr-2" /> افزودن کارمند
+            <PlusCircle className="mr-2" /> {t('settings.employees.add_form.add_button')}
           </Button>
         </form>
       </Form>
       <div className="space-y-2">
-        <h3 className="font-medium">لیست کارمندان</h3>
+        <h3 className="font-medium">{t('settings.employees.list.title')}</h3>
         {employees.length > 0 ? (
           <ul className="rounded-md border">
             {employees.map((item) => (
@@ -325,7 +329,7 @@ function EmployeeForm() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground text-center p-4">هنوز کارمندی تعریف نشده است.</p>
+          <p className="text-sm text-muted-foreground text-center p-4">{t('settings.employees.list.no_employees')}</p>
         )}
       </div>
     </div>
@@ -334,21 +338,22 @@ function EmployeeForm() {
 
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">تنظیمات</h1>
+      <h1 className="text-3xl font-bold mb-6">{t('settings.title')}</h1>
       <Tabs defaultValue="exchange-rates">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="exchange-rates">نرخ ارز</TabsTrigger>
-          <TabsTrigger value="cost-titles">عناوین هزینه</TabsTrigger>
-          <TabsTrigger value="employees">کارمندان</TabsTrigger>
+          <TabsTrigger value="exchange-rates">{t('settings.exchange_rates.tab')}</TabsTrigger>
+          <TabsTrigger value="cost-titles">{t('settings.cost_titles.tab')}</TabsTrigger>
+          <TabsTrigger value="employees">{t('settings.employees.tab')}</TabsTrigger>
         </TabsList>
         <TabsContent value="exchange-rates">
           <Card>
             <CardHeader>
-              <CardTitle>نرخ ارز</CardTitle>
+              <CardTitle>{t('settings.exchange_rates.title')}</CardTitle>
               <CardDescription>
-                ارزش ارزهای خارجی را نسبت به تومان تنظیم کنید.
+                {t('settings.exchange_rates.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -359,9 +364,9 @@ export default function SettingsPage() {
         <TabsContent value="cost-titles">
           <Card>
             <CardHeader>
-              <CardTitle>عناوین هزینه</CardTitle>
+              <CardTitle>{t('settings.cost_titles.title')}</CardTitle>
               <CardDescription>
-                انواع هزینه‌هایی که می‌توانید به محصولات اضافه کنید را مدیریت کنید.
+                {t('settings.cost_titles.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -372,9 +377,9 @@ export default function SettingsPage() {
          <TabsContent value="employees">
           <Card>
             <CardHeader>
-              <CardTitle>مدیریت کارمندان</CardTitle>
+              <CardTitle>{t('settings.employees.title')}</CardTitle>
               <CardDescription>
-                کارمندان و حقوق ماهانه آن‌ها را تعریف کنید. حقوق به طور خودکار به هزینه‌های دوره‌ای اضافه خواهد شد.
+                {t('settings.employees.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
