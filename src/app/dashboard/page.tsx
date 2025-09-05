@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { PlusCircle, Download, Trash2, Pencil, BarChart2 } from 'lucide-react';
+import { PlusCircle, Download, Trash2, Pencil, BarChart2, ImageIcon } from 'lucide-react';
 import type { Product, ExchangeRate, CostTitle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
