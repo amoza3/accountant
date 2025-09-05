@@ -5,6 +5,8 @@ import { IndexedDBDataProvider } from '@/lib/db-indexeddb';
 import { FirestoreDataProvider } from '@/lib/db-firestore';
 import { createFirebaseApp } from '@/lib/firebase';
 import type { DataProvider } from '@/lib/dataprovider';
+import { getAuth, User } from 'firebase/auth';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 export type StorageType = 'local' | 'cloud';
 
@@ -15,48 +17,65 @@ interface AppContextValue {
   setGlobalLoading: (isLoading: boolean) => void;
   storageType: StorageType;
   changeStorageType: (newType: StorageType) => void;
+  user: User | null | undefined;
+  authLoading: boolean;
+  auth: ReturnType<typeof getAuth>;
 }
 
 const AppContext = React.createContext<AppContextValue | null>(null);
 
+const app = createFirebaseApp();
+const auth = getAuth(app);
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [storageType, setStorageType] = useState<StorageType>('local');
   const [dataProvider, setDataProvider] = useState<DataProvider | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDbLoading, setIsDbLoading] = useState(true);
   const [isGlobalLoading, setGlobalLoading] = useState(false);
+  const [user, authLoading] = useAuthState(auth);
 
   useEffect(() => {
-    // Determine storage type from localStorage on mount
     const savedProvider = (localStorage.getItem('storageType') as StorageType) || 'local';
     setStorageType(savedProvider);
   }, []);
 
   useEffect(() => {
     async function initializeProvider() {
-      setIsLoading(true);
+      setIsDbLoading(true);
       setGlobalLoading(true);
       let provider: DataProvider;
 
       if (storageType === 'cloud') {
-        // Ensure Firebase is initialized with the correct config before setting the provider
-        await createFirebaseApp();
-        provider = FirestoreDataProvider;
+        if (user) {
+            // Pass user ID to provider if needed for collection pathing
+            provider = FirestoreDataProvider(user.uid);
+        } else if (!authLoading) {
+            // Don't initialize cloud provider if user is not logged in and auth check is complete
+            setIsDbLoading(false);
+            setGlobalLoading(false);
+            return;
+        } else {
+            // Auth is still loading, wait...
+            return
+        }
       } else {
         provider = IndexedDBDataProvider;
       }
       
       setDataProvider(() => provider);
-      setIsLoading(false);
+      setIsDbLoading(false);
       setGlobalLoading(false);
     }
 
     initializeProvider();
-  }, [storageType]);
+  }, [storageType, user, authLoading]);
   
   const changeStorageType = useCallback((newType: StorageType) => {
     localStorage.setItem('storageType', newType);
     setStorageType(newType);
   }, []);
+  
+  const isLoading = isDbLoading || authLoading;
 
   const contextValue = useMemo(() => ({
     db: dataProvider,
@@ -65,7 +84,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGlobalLoading,
     storageType,
     changeStorageType,
-  }), [dataProvider, isLoading, isGlobalLoading, storageType, changeStorageType]);
+    user,
+    authLoading,
+    auth,
+  }), [dataProvider, isLoading, isGlobalLoading, storageType, changeStorageType, user, authLoading, auth]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }

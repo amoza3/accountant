@@ -10,20 +10,25 @@ import {
   Settings,
   History,
   Users,
-  Receipt
+  Receipt,
+  LogOut,
 } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
+import { useAppContext } from '@/components/app-provider';
+import { Button } from '../ui/button';
 
 export function MainSidebar({ appName }: { appName: string }) {
   const pathname = usePathname();
+  const { auth, user } = useAppContext();
 
   const menuItems = [
     {
@@ -100,6 +105,17 @@ export function MainSidebar({ appName }: { appName: string }) {
           ))}
         </SidebarMenu>
       </SidebarContent>
+       <SidebarFooter>
+        {user && (
+            <div className="flex flex-col gap-2 p-2">
+                <p className="text-xs text-muted-foreground px-2">وارد شده با: {user.email}</p>
+                <Button variant="ghost" className="justify-start" onClick={() => auth.signOut()}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    خروج
+                </Button>
+            </div>
+        )}
+      </SidebarFooter>
     </Sidebar>
   );
 }
