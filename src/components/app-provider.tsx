@@ -46,21 +46,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const savedProvider = (localStorage.getItem('storageType') as StorageType) || 'local';
     setStorageType(savedProvider);
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        if (DEV_MODE_UID && savedProvider === 'local') {
-           const devUser: UserProfile = {
-              id: DEV_MODE_UID,
-              email: 'dev@example.com',
-              displayName: 'Dev User',
-              role: 'superadmin',
-            };
-            setUser(devUser);
-            const dbInstance = IndexedDBDataProvider;
-            await dbInstance.saveUserProfile(devUser); // Ensure dev profile exists
-            setAuthLoading(false);
-            return;
-        }
+    if (DEV_MODE_UID) {
+        const devUser: UserProfile = {
+           id: DEV_MODE_UID,
+           email: 'dev@example.com',
+           displayName: 'Dev User',
+           role: 'superadmin',
+         };
+         setUser(devUser);
+         setAuthLoading(false);
+         return;
+    }
 
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
           const dbInstance = savedProvider === 'cloud' ? FirestoreDataProvider(currentUser.uid, false) : IndexedDBDataProvider;
           const userProfile = await dbInstance.getUserProfile(currentUser.uid);
