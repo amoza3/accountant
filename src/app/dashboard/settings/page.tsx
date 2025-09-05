@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Trash2, PlusCircle, Users, Database, Loader2 } from 'lucide-react';
+import { Trash2, PlusCircle, Users, Database, Loader2, Store, Banknote, Tag } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,14 +25,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 
-import type { ExchangeRate, CostTitle, Employee, FirebaseConfig } from '@/lib/types';
+import type { ExchangeRate, CostTitle, Employee, AppSettings } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppContext } from '@/components/app-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { StorageType } from '@/components/app-provider';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const appSettingsSchema = z.object({
+  shopName: z.string().min(1, 'نام فروشگاه الزامی است'),
+});
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -53,14 +56,71 @@ const employeeSchema = z.object({
   salary: z.coerce.number().min(0, 'حقوق نمی‌تواند منفی باشد'),
 });
 
-const firebaseConfigSchema = z.object({
-  apiKey: z.string().min(1, 'API Key is required'),
-  authDomain: z.string().min(1, 'Auth Domain is required'),
-  projectId: z.string().min(1, 'Project ID is required'),
-  storageBucket: z.string().min(1, 'Storage Bucket is required'),
-  messagingSenderId: z.string().min(1, 'Messaging Sender ID is required'),
-  appId: z.string().min(1, 'App ID is required'),
-});
+
+function AppSettingsForm() {
+    const { toast } = useToast();
+    const { db, settings, setSettings } = useAppContext();
+    const form = useForm<z.infer<typeof appSettingsSchema>>({
+        resolver: zodResolver(appSettingsSchema),
+        defaultValues: {
+            shopName: settings.shopName || '',
+        },
+    });
+    
+    const { formState: { isSubmitting } } = form;
+
+    useEffect(() => {
+        form.reset({ shopName: settings.shopName || '' });
+    }, [settings, form]);
+
+    const onSubmit = async (data: z.infer<typeof appSettingsSchema>) => {
+        if(!db) return;
+        try {
+            const newSettings = { ...settings, ...data };
+            await db.saveAppSettings(newSettings);
+            setSettings(newSettings);
+            toast({ title: 'تنظیمات ذخیره شد', description: 'نام فروشگاه با موفقیت به‌روزرسانی شد.' });
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'خطا',
+                description: 'ذخیره تنظیمات ناموفق بود.',
+            });
+        }
+    }
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>اطلاعات فروشگاه</CardTitle>
+                <CardDescription>نام فروشگاه خود را برای نمایش در برنامه تنظیم کنید.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="shopName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>نام فروشگاه</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="نام فروشگاه شما" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" disabled={isSubmitting || !db}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isSubmitting ? 'در حال ذخیره...' : 'ذخیره نام'}
+                        </Button>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
+}
 
 function ExchangeRatesForm() {
   const { toast } = useToast();
@@ -414,13 +474,17 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">تنظیمات</h1>
-      <Tabs defaultValue="data-storage" dir="rtl">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="data-storage">ذخیره‌سازی داده</TabsTrigger>
-          <TabsTrigger value="exchange-rates">نرخ‌های ارز</TabsTrigger>
-          <TabsTrigger value="cost-titles">عناوین هزینه</TabsTrigger>
-          <TabsTrigger value="employees">کارمندان</TabsTrigger>
+      <Tabs defaultValue="general" dir="rtl">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general"><Store className="w-4 h-4 ml-1" />عمومی</TabsTrigger>
+          <TabsTrigger value="data-storage"><Database className="w-4 h-4 ml-1" />ذخیره‌سازی</TabsTrigger>
+          <TabsTrigger value="exchange-rates"><Banknote className="w-4 h-4 ml-1" />نرخ‌های ارز</TabsTrigger>
+          <TabsTrigger value="cost-titles"><Tag className="w-4 h-4 ml-1" />عناوین هزینه</TabsTrigger>
+          <TabsTrigger value="employees"><Users className="w-4 h-4 ml-1" />کارمندان</TabsTrigger>
         </TabsList>
+        <TabsContent value="general">
+            <AppSettingsForm />
+        </TabsContent>
          <TabsContent value="data-storage">
             <Card>
                 <CardHeader>
