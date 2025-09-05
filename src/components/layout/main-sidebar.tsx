@@ -23,11 +23,13 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { useAppContext } from '@/components/app-provider';
 import { Button } from '../ui/button';
 import { ThemeSwitcher } from './theme-switcher';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 const DEV_MODE_UID = process.env.NEXT_PUBLIC_DEV_MODE_USER_UID;
 
@@ -38,7 +40,6 @@ export function MainSidebar() {
 
   const handleLogout = () => {
     if (DEV_MODE_UID) {
-      // In dev mode, just redirect to simulate logout
       router.push('/');
     } else {
       auth.signOut();
@@ -95,20 +96,38 @@ export function MainSidebar() {
         icon: Shield,
     }
   ];
+  
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join('');
+  };
 
   const isLinkActive = (href: string) => {
-    // Exact match for dashboard
     if (href.endsWith('/dashboard')) {
       return pathname === href || pathname === '/dashboard';
     }
-    // Starts with for sub-pages
     return pathname.startsWith(href);
   };
   
   return (
     <Sidebar className="border-l border-r-0" dir="rtl" side="right">
-      <SidebarHeader className="border-b border-b-0 border-t">
+      <SidebarHeader className="border-b border-b-0 border-t flex flex-col gap-4">
         <Logo>{settings.shopName || 'حسابدار آنلاین آموزا'}</Logo>
+        {user && (
+            <div className="flex items-center gap-3 px-2">
+                 <Avatar className="h-10 w-10">
+                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User Avatar'} />
+                    <AvatarFallback>{getInitials(user.displayName || user.email || 'U')}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col truncate">
+                    <span className="font-semibold text-sm truncate">{user.displayName}</span>
+                    <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                </div>
+            </div>
+        )}
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
@@ -128,6 +147,7 @@ export function MainSidebar() {
           ))}
            {user?.role === 'superadmin' && (
             <>
+                <SidebarSeparator />
                 <SidebarMenuItem>
                     <div className="p-2 text-xs font-semibold text-muted-foreground">پنل ادمین</div>
                 </SidebarMenuItem>
@@ -151,15 +171,10 @@ export function MainSidebar() {
       </SidebarContent>
        <SidebarFooter>
         <ThemeSwitcher />
-        {user && (
-            <div className="flex flex-col gap-2 p-2">
-                <p className="text-xs text-muted-foreground px-2">وارد شده با: {user.email}</p>
-                <Button variant="ghost" className="justify-start" onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    خروج
-                </Button>
-            </div>
-        )}
+         <Button variant="ghost" className="w-full justify-start text-right" onClick={handleLogout}>
+            <LogOut className="ml-2" />
+            <span>خروج</span>
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );

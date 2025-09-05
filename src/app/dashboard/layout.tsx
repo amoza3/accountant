@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -22,8 +23,11 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     }, [user, authLoading, router]);
 
     if (authLoading || !user) {
-        // You can show a global loader here if you prefer
-        return <GlobalProgressBar />;
+        return (
+             <div className="flex min-h-screen items-center justify-center bg-muted">
+                <GlobalProgressBar />
+             </div>
+        )
     }
 
     return <>{children}</>;

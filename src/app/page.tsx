@@ -11,8 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 
-const DEV_MODE_UID = process.env.NEXT_PUBLIC_DEV_MODE_USER_UID;
-
 export default function LoginPage() {
   const { user, authLoading, auth } = useAppContext();
   const router = useRouter();
@@ -49,14 +47,14 @@ export default function LoginPage() {
 
   if (authLoading || user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted">
-        <Loader2 className="h-16 w-16 animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
