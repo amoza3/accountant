@@ -5,8 +5,7 @@ import { IndexedDBDataProvider } from '@/lib/db-indexeddb';
 import { FirestoreDataProvider } from '@/lib/db-firestore';
 import { createFirebaseApp } from '@/lib/firebase';
 import type { DataProvider } from '@/lib/dataprovider';
-import { getAuth, User } from 'firebase/auth';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 
 export type StorageType = 'local' | 'cloud';
 
@@ -32,7 +31,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [dataProvider, setDataProvider] = useState<DataProvider | null>(null);
   const [isDbLoading, setIsDbLoading] = useState(true);
   const [isGlobalLoading, setGlobalLoading] = useState(false);
-  const [user, authLoading] = useAuthState(auth);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const savedProvider = (localStorage.getItem('storageType') as StorageType) || 'local';
