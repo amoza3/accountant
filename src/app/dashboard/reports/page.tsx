@@ -250,6 +250,19 @@ export default function ReportsPage() {
     all: 'کل بازه',
   }
 
+  if (isLoading) {
+    return (
+         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-96 w-full lg:col-span-5" />
+        </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
@@ -267,16 +280,7 @@ export default function ReportsPage() {
             </Select>
         </div>
       </div>
-        {isLoading ? (
-             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-96 w-full lg:col-span-5" />
-            </div>
-        ) : sales.length > 0 || expenses.length > 0 ? (
+        {sales.length > 0 || expenses.length > 0 ? (
         <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card>

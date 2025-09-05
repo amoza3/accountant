@@ -496,6 +496,14 @@ export default function InventoryPage() {
     );
   }, [products, searchTerm]);
 
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
@@ -523,11 +531,7 @@ export default function InventoryPage() {
         />
       </div>
 
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
-        </div>
-      ) : filteredProducts.length > 0 ? (
+      {filteredProducts.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((product) => (
             <ProductCard

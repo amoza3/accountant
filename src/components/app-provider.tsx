@@ -36,7 +36,7 @@ const auth = getAuth(app);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [storageType, setStorageType] = useState<StorageType>('local');
   const [dataProvider, setDataProvider] = useState<DataProvider | null>(null);
-  const [isDbLoading, setIsDbLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isGlobalLoading, setGlobalLoading] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -47,17 +47,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setStorageType(savedProvider);
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (DEV_MODE_UID && savedProvider === 'local') {
-         console.log(`[DEV MODE] Bypassing auth and using mock user with UID: ${DEV_MODE_UID}`);
-         setUser({
-            id: DEV_MODE_UID,
-            email: 'dev@example.com',
-            displayName: 'Dev User',
-            role: 'superadmin', // Dev user is always superadmin for local testing
-          });
-          setAuthLoading(false);
-          return;
-      }
+        if (DEV_MODE_UID && savedProvider === 'local') {
+           const devUser: UserProfile = {
+              id: DEV_MODE_UID,
+              email: 'dev@example.com',
+              displayName: 'Dev User',
+              role: 'superadmin',
+            };
+            setUser(devUser);
+            const dbInstance = IndexedDBDataProvider;
+            await dbInstance.saveUserProfile(devUser); // Ensure dev profile exists
+            setAuthLoading(false);
+            return;
+        }
 
       if (currentUser) {
           const dbInstance = savedProvider === 'cloud' ? FirestoreDataProvider(currentUser.uid, false) : IndexedDBDataProvider;
@@ -65,7 +67,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
            if (userProfile) {
               setUser(userProfile);
           } else {
-              // Create a profile if it doesn't exist.
               const newUserProfile: UserProfile = {
                   id: currentUser.uid,
                   email: currentUser.email,
@@ -82,26 +83,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [storageType]);
+  }, []);
 
 
   useEffect(() => {
     async function initializeProvider() {
-      setIsDbLoading(true);
-      setGlobalLoading(true);
-      let provider: DataProvider;
+      if (authLoading) return;
       
+      setIsLoading(true);
+
+      let provider: DataProvider;
       const currentUserId = user?.id;
 
       if (storageType === 'cloud') {
         if (currentUserId) {
-            const isSuperAdmin = user.role === 'superadmin';
+            const isSuperAdmin = user?.role === 'superadmin';
             provider = FirestoreDataProvider(currentUserId, isSuperAdmin);
-        } else if (!authLoading) {
-            setIsDbLoading(false);
-            setGlobalLoading(false);
-            return;
         } else {
+            setIsLoading(false);
             return;
         }
       } else {
@@ -115,14 +114,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error("Failed to fetch app settings:", e);
       }
       
-      setDataProvider(() => provider);
-      setIsDbLoading(false);
-      setGlobalLoading(false);
+      setDataProvider(provider);
+      setIsLoading(false);
     }
 
-    if (!authLoading) {
-        initializeProvider();
-    }
+    initializeProvider();
     
   }, [storageType, user, authLoading]);
   
@@ -130,8 +126,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('storageType', newType);
     setStorageType(newType);
   }, []);
-  
-  const isLoading = isDbLoading || authLoading;
 
   const contextValue = useMemo(() => ({
     db: dataProvider,
