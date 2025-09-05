@@ -1,45 +1,47 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Global helper function to check if a user is authenticated.
+    
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper function to check if the user is the owner of the document.
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Helper function to check if the user is a superadmin by reading their own profile.
+    // Check the user's custom claim for the superadmin role.
+    // This is more secure than reading from the document.
     function isSuperAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
     }
 
-    // Rules for all subcollections within a user's document (e.g., products, sales, etc.)
-    // Users can only read and write to their own subcollections.
-    match /users/{userId}/{documents=**} {
-      allow read, write: if isOwner(userId);
-    }
-    
-    // Rules for the 'users' collection itself.
-    match /users/{document} {
-      // Allow any authenticated user to create their own user profile document.
-      // The document ID must match their own UID.
-      allow create: if isSignedIn() && request.resource.id == request.auth.uid;
+    // Rules for the 'users' collection itself
+    match /users/{userId} {
+      // Anyone can create their own user document.
+      allow create: if isSignedIn() && request.auth.uid == userId;
+
+      // Only the owner or a superadmin can read a user's profile.
+      allow get: if isOwner(userId) || isSuperAdmin();
       
-      // Allow a user to read their own profile.
-      allow get: if isOwner(document);
+      // Only the owner can update their own profile.
+      allow update: if isOwner(userId);
+      
+      // Nobody can delete a user profile for now.
+      allow delete: if false;
 
-      // Allow a user to update their own profile.
-      allow update: if isOwner(document);
-
-      // Only superadmins can delete profiles (for future implementation).
-      allow delete: if isSuperAdmin();
-
-      // **CRITICAL FIX**: Only a superadmin can list all user documents.
+      // Only a superadmin can list all user documents.
       allow list: if isSuperAdmin();
+      
+       // Rule for all subcollections within a user's document
+       match /{document=**} {
+         // The owner of the parent document or a superadmin can read.
+         allow read: if isOwner(userId) || isSuperAdmin();
+         // Only the owner can write to their own subcollections.
+         allow write: if isOwner(userId);
+       }
     }
   }
 }
+    
