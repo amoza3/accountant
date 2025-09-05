@@ -51,6 +51,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
            id: DEV_MODE_UID,
            email: 'dev@example.com',
            displayName: 'Dev User',
+           photoURL: `https://i.pravatar.cc/150?u=${DEV_MODE_UID}`,
            role: 'superadmin',
          };
          setUser(devUser);
@@ -69,6 +70,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   id: currentUser.uid,
                   email: currentUser.email,
                   displayName: currentUser.displayName,
+                  photoURL: currentUser.photoURL,
                   role: currentUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user'
               };
               await dbInstance.saveUserProfile(newUserProfile);

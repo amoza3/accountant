@@ -698,6 +698,8 @@ export const IndexedDBDataProvider: DataProvider = {
     });
   },
   getAllUsers: async (): Promise<UserProfile[]> => {
+    // This is a Firestore-specific feature for superadmins.
+    // In local mode, we don't have a concept of multiple users.
     return Promise.resolve([]);
   },
 };

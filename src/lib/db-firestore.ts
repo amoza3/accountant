@@ -415,6 +415,7 @@ export const FirestoreDataProvider = (userId: string, isSuperAdmin: boolean): Da
     },
     getAllUsers: async () => {
         if (!isSuperAdmin) {
+            console.error("Access Denied: Only superadmins can get all users.");
             return [];
         }
         const db = getDb();

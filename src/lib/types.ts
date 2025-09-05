@@ -106,5 +106,6 @@ export interface UserProfile {
     id: string; // UID from Firebase Auth
     email?: string | null;
     displayName?: string | null;
+    photoURL?: string | null;
     role: 'user' | 'superadmin';
 }
