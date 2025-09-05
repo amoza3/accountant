@@ -32,15 +32,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isDbLoading, setIsDbLoading] = useState(true);
   const [isGlobalLoading, setGlobalLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false); // Changed to false for dev
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-    });
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
+    // DEV MODE: Set a mock user to bypass login
+    setUser({
+      uid: 'kTyOtB5QpjT8KPMsmejr11kAM7r1',
+      email: 'dev@example.com',
+      displayName: 'Dev User',
+      photoURL: '',
+      emailVerified: true,
+      isAnonymous: false,
+      metadata: {},
+      providerData: [],
+    } as User);
+    setAuthLoading(false);
+
+    // Original auth logic is commented out for development
+    // const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    //   setUser(currentUser);
+    //   setAuthLoading(false);
+    // });
+    // return () => unsubscribe();
   }, []);
 
   useEffect(() => {
