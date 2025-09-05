@@ -2,43 +2,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 
 import { createFirebaseApp } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 
 const app = createFirebaseApp();
 const auth = getAuth(app);
-
-const loginSchema = z.object({
-    email: z.string().email({ message: 'لطفا یک ایمیل معتبر وارد کنید.' }),
-    password: z.string().min(6, { message: 'رمز عبور باید حداقل ۶ کاراکتر باشد.' }),
-});
+const provider = new GoogleAuthProvider();
 
 export default function LoginPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-
-  const form = useForm<z.infer<typeof loginSchema>>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
-  });
-
-  const { formState: { isSubmitting } } = form;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -54,27 +38,23 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
   
-  const handleAuthAction = async (data: z.infer<typeof loginSchema>, action: 'signIn' | 'signUp') => {
+  const handleGoogleSignIn = async () => {
+    setIsSubmitting(true);
     try {
-      if (action === 'signIn') {
-        await signInWithEmailAndPassword(auth, data.email, data.password);
-        toast({ title: 'ورود موفق', description: 'با موفقیت وارد شدید.' });
-      } else {
-        await createUserWithEmailAndPassword(auth, data.email, data.password);
-        toast({ title: 'ثبت نام موفق', description: 'حساب کاربری شما ایجاد شد. خوش آمدید!' });
-      }
+      await signInWithPopup(auth, provider);
+      toast({ title: 'ورود موفق', description: 'با موفقیت وارد شدید.' });
       // The onAuthStateChanged listener will handle the redirect
     } catch (error: any) {
-        let message = 'عملیات ناموفق بود.';
-        if (error.code === 'auth/user-not-found') message = 'کاربری با این ایمیل یافت نشد.';
-        if (error.code === 'auth/wrong-password') message = 'رمز عبور اشتباه است.';
-        if (error.code === 'auth/email-already-in-use') message = 'این ایمیل قبلا استفاده شده است.';
-        
+        let message = 'ورود با گوگل ناموفق بود.';
+        // You can check for specific error codes if needed, e.g., 'auth/popup-closed-by-user'
+        console.error("Google Sign-In Error:", error);
         toast({
             variant: 'destructive',
             title: 'خطا',
             description: message,
         });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -87,14 +67,7 @@ export default function LoginPage() {
                     <Skeleton className="h-4 w-48 mx-auto" />
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                     <div className="flex items-center space-x-2">
-                        <Skeleton className="h-4 flex-1" />
-                        <Skeleton className="h-4 w-12" />
-                        <Skeleton className="h-4 flex-1" />
-                    </div>
-                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-12 w-full" />
                 </CardContent>
             </Card>
         </div>
@@ -107,59 +80,37 @@ export default function LoginPage() {
         <Card className="w-full max-w-md shadow-lg">
             <CardHeader className="text-center space-y-4">
                 <Logo className="justify-center" />
-                <CardTitle className="text-2xl">ورود یا ثبت‌نام</CardTitle>
-                <CardDescription>برای دسترسی به داشبورد، لطفاً وارد شوید یا ثبت‌نام کنید.</CardDescription>
+                <CardTitle className="text-2xl">خوش آمدید!</CardTitle>
+                <CardDescription>برای دسترسی به داشبورد، لطفاً با حساب گوگل خود وارد شوید.</CardDescription>
             </CardHeader>
             <CardContent>
-                 <Form {...form}>
-                    <form className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                <Label>ایمیل</Label>
-                                <FormControl>
-                                    <Input placeholder="name@example.com" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="password"
-                            render={({ field }) => (
-                                <FormItem>
-                                <Label>رمز عبور</Label>
-                                <FormControl>
-                                    <Input type="password" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                           <Button 
-                             onClick={form.handleSubmit(data => handleAuthAction(data, 'signIn'))} 
-                             className="w-full"
-                             disabled={isSubmitting}
-                            >
-                              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              ورود
-                           </Button>
-                           <Button 
-                             onClick={form.handleSubmit(data => handleAuthAction(data, 'signUp'))}
-                             variant="outline" 
-                             className="w-full"
-                             disabled={isSubmitting}
-                            >
-                               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                ثبت‌نام
-                           </Button>
-                        </div>
-                    </form>
-                </Form>
+                 <Button 
+                    onClick={handleGoogleSignIn} 
+                    className="w-full"
+                    disabled={isSubmitting}
+                    size="lg"
+                >
+                    {isSubmitting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <svg
+                          className="mr-2 h-5 w-5"
+                          aria-hidden="true"
+                          focusable="false"
+                          data-prefix="fab"
+                          data-icon="google"
+                          role="img"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 488 512"
+                        >
+                          <path
+                            fill="currentColor"
+                            d="M488 261.8C488 403.3 381.5 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 23.4 172.9 61.9l-67.7 67.7C314.6 114.5 283.5 104 248 104c-73.8 0-134.3 60.3-134.3 135S174.2 375 248 375c83.8 0 119.3-61.2 122.7-89.3h-122.7v-73.3h239.3c1.3 7.8 2.3 15.6 2.3 23.8z"
+                          ></path>
+                        </svg>
+                    )}
+                    {isSubmitting ? "در حال ورود..." : "ورود با حساب گوگل"}
+                </Button>
             </CardContent>
         </Card>
     </div>
