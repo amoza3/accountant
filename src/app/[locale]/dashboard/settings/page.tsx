@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Trash2, PlusCircle, Users, Database } from 'lucide-react';
+import { Trash2, PlusCircle, Users, Database, Store } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,13 +25,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 
-import type { ExchangeRate, CostTitle, Employee, FirebaseConfig } from '@/lib/types';
+import type { ExchangeRate, CostTitle, Employee, FirebaseConfig, AppSettings } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppContext } from '@/components/app-provider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { StorageType } from '@/components/app-provider';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+
+const appSettingsSchema = z.object({
+  shopName: z.string().min(1, 'نام فروشگاه الزامی است'),
+});
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -52,14 +56,66 @@ const employeeSchema = z.object({
   salary: z.coerce.number().min(0, 'حقوق نمی‌تواند منفی باشد'),
 });
 
-const firebaseConfigSchema = z.object({
-  apiKey: z.string().min(1, 'API Key is required'),
-  authDomain: z.string().min(1, 'Auth Domain is required'),
-  projectId: z.string().min(1, 'Project ID is required'),
-  storageBucket: z.string().min(1, 'Storage Bucket is required'),
-  messagingSenderId: z.string().min(1, 'Messaging Sender ID is required'),
-  appId: z.string().min(1, 'App ID is required'),
-});
+function AppSettingsForm() {
+    const { toast } = useToast();
+    const { db, settings, setSettings } = useAppContext();
+    const form = useForm<z.infer<typeof appSettingsSchema>>({
+        resolver: zodResolver(appSettingsSchema),
+        defaultValues: {
+            shopName: settings.shopName || '',
+        },
+    });
+
+    useEffect(() => {
+        form.reset({ shopName: settings.shopName || '' });
+    }, [settings, form]);
+
+    const onSubmit = async (data: z.infer<typeof appSettingsSchema>) => {
+        if(!db) return;
+        try {
+            await db.saveAppSettings(data);
+            setSettings(data);
+            toast({ title: 'تنظیمات ذخیره شد', description: 'نام فروشگاه با موفقیت به‌روزرسانی شد.' });
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'خطا',
+                description: 'ذخیره تنظیمات ناموفق بود.',
+            });
+        }
+    }
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>اطلاعات فروشگاه</CardTitle>
+                <CardDescription>نام فروشگاه خود را برای نمایش در برنامه تنظیم کنید.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="shopName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>نام فروشگاه</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="نام فروشگاه شما" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" disabled={form.formState.isSubmitting || !db}>
+                            ذخیره نام
+                        </Button>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
+}
 
 function ExchangeRatesForm() {
   const { toast } = useToast();
@@ -380,104 +436,21 @@ function StorageSettingsForm() {
     );
 }
 
-const defaultConfig: FirebaseConfig = {
-    projectId: 'easystock-wlf7q',
-    appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
-    storageBucket: 'easystock-wlf7q.appspot.com',
-    apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
-    authDomain: 'easystock-wlf7q.firebaseapp.com',
-    messagingSenderId: '757179151003',
-};
-
-function FirebaseSettingsForm() {
-    const { toast } = useToast();
-    
-    const form = useForm<FirebaseConfig>({
-        resolver: zodResolver(firebaseConfigSchema),
-        defaultValues: defaultConfig,
-    });
-
-    useEffect(() => {
-        const savedConfig = localStorage.getItem('firebaseConfig');
-        if (savedConfig) {
-            form.reset(JSON.parse(savedConfig));
-        } else {
-            form.reset(defaultConfig);
-        }
-    }, [form]);
-
-    const onSubmit = (data: FirebaseConfig) => {
-        localStorage.setItem('firebaseConfig', JSON.stringify(data));
-        toast({
-            title: 'تنظیمات ذخیره شد',
-            description: 'تنظیمات Firebase با موفقیت ذخیره شد. برنامه مجدداً بارگذاری می‌شود.'
-        });
-        // Optionally, force a reload to apply the new config
-        setTimeout(() => window.location.reload(), 1500);
-    };
-
-    return (
-        <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="projectId" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Project ID</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                 <FormField control={form.control} name="appId" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>App ID</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                 <FormField control={form.control} name="apiKey" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>API Key</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField control={form.control} name="authDomain" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Auth Domain</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField control={form.control} name="storageBucket" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Storage Bucket</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                 <FormField control={form.control} name="messagingSenderId" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Messaging Sender ID</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                <Button type="submit">ذخیره تغییرات</Button>
-            </form>
-        </Form>
-    );
-}
-
 export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">تنظیمات</h1>
-      <Tabs defaultValue="data-storage" dir="rtl">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="general" dir="rtl">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general">عمومی</TabsTrigger>
           <TabsTrigger value="data-storage">ذخیره‌سازی داده</TabsTrigger>
           <TabsTrigger value="exchange-rates">نرخ‌های ارز</TabsTrigger>
           <TabsTrigger value="cost-titles">عناوین هزینه</TabsTrigger>
           <TabsTrigger value="employees">کارمندان</TabsTrigger>
         </TabsList>
+        <TabsContent value="general">
+            <AppSettingsForm />
+        </TabsContent>
          <TabsContent value="data-storage">
             <Card>
                 <CardHeader>
@@ -488,10 +461,6 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-8">
                     <StorageSettingsForm />
-                    <Separator />
-                    <h3 className="text-lg font-medium">تنظیمات اتصال Firebase</h3>
-                    <p className="text-sm text-muted-foreground">اگر از حالت ذخیره‌سازی ابری استفاده می‌کنید، مشخصات پروژه Firebase خود را در این قسمت وارد کنید.</p>
-                    <FirebaseSettingsForm />
                 </CardContent>
             </Card>
         </TabsContent>

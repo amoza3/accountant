@@ -9,6 +9,7 @@ import { GlobalProgressBar } from '@/components/layout/global-progress-bar';
 import { useAppContext } from '@/components/app-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { Logo } from '@/components/logo';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
     const { user, authLoading } = useAppContext();
@@ -30,17 +31,17 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-    const appName = "ایزی استاک";
+    const { settings } = useAppContext();
   return (
     <ProtectedRoute>
       <div className="flex min-h-screen">
-        <MainSidebar appName={appName} />
+        <MainSidebar />
         <SidebarInset className="flex-1 flex flex-col">
           <header className="flex items-center justify-between p-4 border-b md:hidden">
               <SidebarTrigger>
                   <PanelLeft className="h-6 w-6" />
               </SidebarTrigger>
-              <h1 className="text-lg font-semibold">{appName}</h1>
+              <Logo>{settings.shopName || 'ایزی استاک'}</Logo>
           </header>
           <GlobalProgressBar />
           <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">

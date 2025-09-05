@@ -1,6 +1,6 @@
 'use client';
 
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AttachmentSource } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AppSettings, UserProfile } from '@/lib/types';
 import { calculateTotalCostInToman } from '@/lib/utils';
 import { addMonths, addYears, isBefore, startOfDay, isEqual, endOfMonth } from 'date-fns';
 import type { DataProvider } from './dataprovider';
@@ -378,6 +378,7 @@ const updateProduct = (originalId: string, product: Product): Promise<void> => {
 };
 
 const EXCHANGE_RATES_KEY = 'exchangeRates';
+const APP_SETTINGS_KEY = 'appSettings';
 
 const getExchangeRates = (): Promise<ExchangeRate[]> => {
     return new Promise(async (resolve, reject) => {
@@ -424,7 +425,6 @@ export const IndexedDBDataProvider: DataProvider = {
     const saleStore = tx.objectStore(SALE_STORE);
     const productStore = tx.objectStore(PRODUCT_STORE);
     const customerStore = tx.objectStore(CUSTOMER_STORE);
-    const settingsStore = tx.objectStore(SETTINGS_STORE);
 
     let saleToSave: Sale = { ...saleData, id: Date.now(), items: [] };
 
@@ -527,6 +527,26 @@ export const IndexedDBDataProvider: DataProvider = {
         const db = await openDB();
         const store = getStore(COST_TITLES_STORE, 'readwrite');
         const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+  },
+  getAppSettings: (): Promise<AppSettings> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(SETTINGS_STORE, 'readonly');
+        const request = store.get(APP_SETTINGS_KEY);
+        request.onsuccess = () => {
+            resolve(request.result?.value || { shopName: 'ایزی استاک' });
+        };
+        request.onerror = () => reject(request.error);
+    });
+  },
+  saveAppSettings: (settings: AppSettings): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(SETTINGS_STORE, 'readwrite');
+        const request = store.put({ key: APP_SETTINGS_KEY, value: settings });
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
     });
@@ -652,8 +672,10 @@ export const IndexedDBDataProvider: DataProvider = {
   addPayment,
   getPaymentsByIds,
   uploadFile: async (file) => {
-    // For IndexedDB, we'll just convert the file to a Base64 string as a fallback.
-    // This is not efficient for large files and is a limitation of client-side only storage.
     return fileToBase64(file);
+  },
+  getAllUsers: async (): Promise<UserProfile[]> => {
+    // This is a Firestore-specific feature. For IndexedDB, we can only return the current user.
+    return Promise.resolve([]);
   },
 };

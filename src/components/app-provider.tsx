@@ -6,8 +6,11 @@ import { FirestoreDataProvider } from '@/lib/db-firestore';
 import { createFirebaseApp } from '@/lib/firebase';
 import type { DataProvider } from '@/lib/dataprovider';
 import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
+import type { UserProfile, AppSettings } from '@/lib/types';
 
 export type StorageType = 'local' | 'cloud';
+
+const SUPER_ADMIN_UID = 'kTyOtB5QpjT8KPMsmejr11kAM7r1';
 
 interface AppContextValue {
   db: DataProvider | null;
@@ -16,9 +19,11 @@ interface AppContextValue {
   setGlobalLoading: (isLoading: boolean) => void;
   storageType: StorageType;
   changeStorageType: (newType: StorageType) => void;
-  user: User | null | undefined;
+  user: UserProfile | null | undefined;
   authLoading: boolean;
   auth: ReturnType<typeof getAuth>;
+  settings: AppSettings;
+  setSettings: (settings: AppSettings) => void;
 }
 
 const AppContext = React.createContext<AppContextValue | null>(null);
@@ -31,12 +36,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [dataProvider, setDataProvider] = useState<DataProvider | null>(null);
   const [isDbLoading, setIsDbLoading] = useState(true);
   const [isGlobalLoading, setGlobalLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(false); // Changed to false for dev
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [settings, setSettings] = useState<AppSettings>({ shopName: 'ایزی استاک' });
 
   useEffect(() => {
     // DEV MODE: Set a mock user to bypass login
-    setUser({
+    const devUser: User = {
       uid: 'kTyOtB5QpjT8KPMsmejr11kAM7r1',
       email: 'dev@example.com',
       displayName: 'Dev User',
@@ -45,12 +51,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isAnonymous: false,
       metadata: {},
       providerData: [],
-    } as User);
+    } as User;
+
+    setUser({
+        id: devUser.uid,
+        email: devUser.email,
+        displayName: devUser.displayName,
+        role: devUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user',
+    });
     setAuthLoading(false);
 
-    // Original auth logic is commented out for development
     // const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    //   setUser(currentUser);
+    //   if (currentUser) {
+    //       setUser({
+    //           id: currentUser.uid,
+    //           email: currentUser.email,
+    //           displayName: currentUser.displayName,
+    //           role: currentUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user'
+    //       });
+    //   } else {
+    //       setUser(null);
+    //   }
     //   setAuthLoading(false);
     // });
     // return () => unsubscribe();
@@ -69,21 +90,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (storageType === 'cloud') {
         if (user) {
-            // Pass user ID to provider if needed for collection pathing
-            provider = FirestoreDataProvider(user.uid);
+            provider = FirestoreDataProvider(user.id, user.role === 'superadmin');
         } else if (!authLoading) {
-            // Don't initialize cloud provider if user is not logged in and auth check is complete
             setIsDbLoading(false);
             setGlobalLoading(false);
             return;
         } else {
-            // Auth is still loading, wait...
             return
         }
       } else {
         provider = IndexedDBDataProvider;
       }
       
+      const appSettings = await provider.getAppSettings();
+      setSettings(appSettings);
       setDataProvider(() => provider);
       setIsDbLoading(false);
       setGlobalLoading(false);
@@ -109,7 +129,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     user,
     authLoading,
     auth,
-  }), [dataProvider, isLoading, isGlobalLoading, storageType, changeStorageType, user, authLoading, auth]);
+    settings,
+    setSettings,
+  }), [dataProvider, isLoading, isGlobalLoading, storageType, changeStorageType, user, authLoading, auth, settings]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }

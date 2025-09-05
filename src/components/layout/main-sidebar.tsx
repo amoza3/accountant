@@ -12,6 +12,7 @@ import {
   Users,
   Receipt,
   LogOut,
+  Shield,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -26,9 +27,9 @@ import { Logo } from '@/components/logo';
 import { useAppContext } from '@/components/app-provider';
 import { Button } from '../ui/button';
 
-export function MainSidebar({ appName }: { appName: string }) {
+export function MainSidebar() {
   const pathname = usePathname();
-  const { auth, user } = useAppContext();
+  const { auth, user, settings } = useAppContext();
 
   const menuItems = [
     {
@@ -73,6 +74,14 @@ export function MainSidebar({ appName }: { appName: string }) {
     }
   ];
 
+  const adminMenuItems = [
+    {
+        href: '/dashboard/admin/users',
+        label: 'مدیریت کاربران',
+        icon: Shield,
+    }
+  ];
+
   const isLinkActive = (href: string) => {
     // Exact match for dashboard
     if (href.endsWith('/dashboard')) {
@@ -85,7 +94,7 @@ export function MainSidebar({ appName }: { appName: string }) {
   return (
     <Sidebar className="border-l border-r-0" dir="rtl" side="right">
       <SidebarHeader className="border-b border-b-0 border-t">
-        <Logo>{appName}</Logo>
+        <Logo>{settings.shopName || 'ایزی استاک'}</Logo>
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
@@ -103,6 +112,27 @@ export function MainSidebar({ appName }: { appName: string }) {
               </Link>
             </SidebarMenuItem>
           ))}
+           {user?.role === 'superadmin' && (
+            <>
+                <SidebarMenuItem>
+                    <div className="p-2 text-xs font-semibold text-muted-foreground">پنل ادمین</div>
+                </SidebarMenuItem>
+                {adminMenuItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                        <Link href={item.href} passHref>
+                            <SidebarMenuButton
+                            isActive={isLinkActive(item.href)}
+                            tooltip={item.label}
+                            className="text-right"
+                            >
+                            <item.icon className="ml-2" />
+                            <span>{item.label}</span>
+                            </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                ))}
+            </>
+          )}
         </SidebarMenu>
       </SidebarContent>
        <SidebarFooter>

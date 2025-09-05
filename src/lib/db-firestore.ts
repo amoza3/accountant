@@ -11,9 +11,10 @@ import {
     writeBatch,
     runTransaction,
     query,
-    where
+    where,
+    collectionGroup
 } from 'firebase/firestore';
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AttachmentSource } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AppSettings, UserProfile } from '@/lib/types';
 import type { DataProvider } from './dataprovider';
 import { calculateTotalCostInToman } from './utils';
 import { addMonths, addYears, isBefore, startOfDay, isEqual, endOfMonth } from 'date-fns';
@@ -21,8 +22,8 @@ import { addMonths, addYears, isBefore, startOfDay, isEqual, endOfMonth } from '
 const ROOT_COLLECTION = 'users';
 
 // This function now returns a DataProvider instance for a specific user.
-export const FirestoreDataProvider = (userId: string): DataProvider => {
-  const getCollectionPath = (collectionName: string) => `${ROOT_COLLECTION}/${userId}/${collectionName}`;
+export const FirestoreDataProvider = (userId: string, isSuperAdmin: boolean): DataProvider => {
+  const getCollectionPath = (collectionName: string, customUserId?: string) => `${ROOT_COLLECTION}/${customUserId || userId}/${collectionName}`;
 
   const PRODUCTS_COLLECTION = getCollectionPath('products');
   const SALES_COLLECTION = getCollectionPath('sales');
@@ -89,7 +90,7 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
               customerName = newCustomerName;
           }
           
-          const rates = await FirestoreDataProvider(userId).getExchangeRates();
+          const rates = await FirestoreDataProvider(userId, isSuperAdmin).getExchangeRates();
 
           const saleItemsWithCost = await Promise.all(saleData.items.map(async (item) => {
               const productDoc = await transaction.get(doc(db, PRODUCTS_COLLECTION, item.productId));
@@ -103,7 +104,7 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
 
           const finalSale: Sale = {
               ...saleData,
-              id: saleId,
+              id: Number(saleId),
               items: saleItemsWithCost,
               customerId,
               customerName
@@ -116,10 +117,20 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
       const db = getDb();
       const q = collection(db, SALES_COLLECTION);
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => doc.data() as Sale).sort((a,b) => Number(b.id) - Number(a.id));
+      return querySnapshot.docs.map(doc => doc.data() as Sale).sort((a,b) => b.id - a.id);
     },
 
     // Settings Operations
+    getAppSettings: async () => {
+        const db = getDb();
+        const docRef = doc(db, SETTINGS_COLLECTION, 'appSettings');
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists() ? (docSnap.data() as AppSettings) : { shopName: 'ایزی استاک' };
+    },
+    saveAppSettings: async (settings) => {
+        const db = getDb();
+        await setDoc(doc(db, SETTINGS_COLLECTION, 'appSettings'), settings);
+    },
     getExchangeRates: async () => {
       const db = getDb();
       const docRef = doc(db, SETTINGS_COLLECTION, 'exchangeRates');
@@ -231,7 +242,7 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
     deleteExpense: async (id) => {
        const db = getDb();
        const batch = writeBatch(db);
-       const attachments = await FirestoreDataProvider(userId).getAttachmentsBySourceId(id);
+       const attachments = await FirestoreDataProvider(userId, isSuperAdmin).getAttachmentsBySourceId(id);
        attachments.forEach(att => batch.delete(doc(db, ATTACHMENTS_COLLECTION, att.id)));
        batch.delete(doc(db, EXPENSES_COLLECTION, id));
        await batch.commit();
@@ -254,7 +265,7 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
     },
     applyRecurringExpenses: async () => {
       const db = getDb();
-      const recurringExpenses = await FirestoreDataProvider(userId).getAllRecurringExpenses();
+      const recurringExpenses = await FirestoreDataProvider(userId, isSuperAdmin).getAllRecurringExpenses();
       const today = startOfDay(new Date());
       let expensesAddedCount = 0;
       const batch = writeBatch(db);
@@ -350,7 +361,6 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
       return querySnapshot.docs.map(doc => doc.data() as Attachment);
     },
     uploadFile: async (file: File): Promise<string> => {
-        // This is now simplified to just convert to base64, no Storage upload
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -367,7 +377,6 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
       
       const attachmentIds = await Promise.all(attachments.map(async (att) => {
           const attachmentId = Date.now().toString() + Math.random();
-          // No upload, just pass base64 string
           const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: paymentId, sourceType: 'payment' };
           batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
           return attachmentId;
@@ -391,5 +400,26 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
       const paymentDocs = await Promise.all(paymentPromises);
       return paymentDocs.filter(doc => doc.exists()).map(doc => doc.data() as Payment);
     },
+    // Super Admin Operations
+    getAllUsers: async () => {
+        if (!isSuperAdmin) {
+            return [];
+        }
+        const db = getDb();
+        const usersSnapshot = await getDocs(collection(db, ROOT_COLLECTION));
+        const userProfiles: UserProfile[] = [];
+
+        for (const userDoc of usersSnapshot.docs) {
+            const settingsDoc = await getDoc(doc(db, getCollectionPath('settings', userDoc.id), 'appSettings'));
+            const shopName = settingsDoc.exists() ? (settingsDoc.data() as AppSettings).shopName : 'نامشخص';
+            userProfiles.push({
+                id: userDoc.id,
+                role: 'user',
+                displayName: shopName, // Using shop name as display name for admin panel
+                email: 'نامشخص' // email is not stored in user collection
+            });
+        }
+        return userProfiles;
+    }
   };
 };

@@ -1,4 +1,4 @@
-import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Payment, Attachment, AttachmentSource } from '@/lib/types';
+import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Payment, Attachment, AttachmentSource, AppSettings, UserProfile } from '@/lib/types';
 
 export interface DataProvider {
   // Product Operations
@@ -18,6 +18,8 @@ export interface DataProvider {
   getCostTitles: () => Promise<CostTitle[]>;
   addCostTitle: (costTitle: CostTitle) => Promise<void>;
   deleteCostTitle: (id: string) => Promise<void>;
+  getAppSettings: () => Promise<AppSettings>;
+  saveAppSettings: (settings: AppSettings) => Promise<void>;
   
   // Customer Operations
   addCustomer: (customer: Customer) => Promise<string>;
@@ -50,4 +52,7 @@ export interface DataProvider {
   // Payment Operations
   addPayment: (paymentData: Omit<Payment, 'id' | 'attachmentIds'>, attachments: Omit<Attachment, 'id'| 'sourceId' | 'sourceType'>[]) => Promise<string>;
   getPaymentsByIds: (ids: string[]) => Promise<Payment[]>;
+
+  // Admin operations
+  getAllUsers: () => Promise<UserProfile[]>;
 }
