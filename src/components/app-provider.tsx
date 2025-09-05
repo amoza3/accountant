@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -11,6 +12,7 @@ import type { UserProfile, AppSettings } from '@/lib/types';
 export type StorageType = 'local' | 'cloud';
 
 const SUPER_ADMIN_UID = 'kTyOtB5QpjT8KPMsmejr11kAM7r1';
+const DEV_MODE_UID = process.env.NEXT_PUBLIC_DEV_MODE_USER_UID;
 
 interface AppContextValue {
   db: DataProvider | null;
@@ -41,40 +43,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({ shopName: 'ایزی استاک' });
 
   useEffect(() => {
-    // DEV MODE: Set a mock user to bypass login
-    const devUser: User = {
-      uid: 'kTyOtB5QpjT8KPMsmejr11kAM7r1',
-      email: 'dev@example.com',
-      displayName: 'Dev User',
-      photoURL: '',
-      emailVerified: true,
-      isAnonymous: false,
-      metadata: {},
-      providerData: [],
-    } as User;
+    if (DEV_MODE_UID) {
+      console.log(`[DEV MODE] Mocking user with UID: ${DEV_MODE_UID}`);
+      const isSuperAdmin = DEV_MODE_UID === SUPER_ADMIN_UID;
+      setUser({
+        id: DEV_MODE_UID,
+        email: isSuperAdmin ? 'superadmin@example.com' : 'dev@example.com',
+        displayName: isSuperAdmin ? 'Super Admin' : 'Dev User',
+        role: isSuperAdmin ? 'superadmin' : 'user',
+      });
+      setAuthLoading(false);
+      return;
+    }
 
-    setUser({
-        id: devUser.uid,
-        email: devUser.email,
-        displayName: devUser.displayName,
-        role: devUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user',
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+          setUser({
+              id: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              role: currentUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user'
+          });
+      } else {
+          setUser(null);
+      }
+      setAuthLoading(false);
     });
-    setAuthLoading(false);
-
-    // const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    //   if (currentUser) {
-    //       setUser({
-    //           id: currentUser.uid,
-    //           email: currentUser.email,
-    //           displayName: currentUser.displayName,
-    //           role: currentUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user'
-    //       });
-    //   } else {
-    //       setUser(null);
-    //   }
-    //   setAuthLoading(false);
-    // });
-    // return () => unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -87,16 +82,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsDbLoading(true);
       setGlobalLoading(true);
       let provider: DataProvider;
+      
+      const currentUserId = DEV_MODE_UID || user?.id;
 
       if (storageType === 'cloud') {
-        if (user) {
-            provider = FirestoreDataProvider(user.id, user.role === 'superadmin');
+        if (currentUserId) {
+            const isSuperAdmin = currentUserId === SUPER_ADMIN_UID;
+            provider = FirestoreDataProvider(currentUserId, isSuperAdmin);
         } else if (!authLoading) {
             setIsDbLoading(false);
             setGlobalLoading(false);
             return;
         } else {
-            return
+            return;
         }
       } else {
         provider = IndexedDBDataProvider;

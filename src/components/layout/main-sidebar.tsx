@@ -1,7 +1,8 @@
+
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -27,9 +28,21 @@ import { Logo } from '@/components/logo';
 import { useAppContext } from '@/components/app-provider';
 import { Button } from '../ui/button';
 
+const DEV_MODE_UID = process.env.NEXT_PUBLIC_DEV_MODE_USER_UID;
+
 export function MainSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { auth, user, settings } = useAppContext();
+
+  const handleLogout = () => {
+    if (DEV_MODE_UID) {
+      // In dev mode, just redirect to simulate logout
+      router.push('/');
+    } else {
+      auth.signOut();
+    }
+  };
 
   const menuItems = [
     {
@@ -85,7 +98,7 @@ export function MainSidebar() {
   const isLinkActive = (href: string) => {
     // Exact match for dashboard
     if (href.endsWith('/dashboard')) {
-      return pathname === href;
+      return pathname === href || pathname === '/dashboard';
     }
     // Starts with for sub-pages
     return pathname.startsWith(href);
@@ -139,7 +152,7 @@ export function MainSidebar() {
         {user && (
             <div className="flex flex-col gap-2 p-2">
                 <p className="text-xs text-muted-foreground px-2">وارد شده با: {user.email}</p>
-                <Button variant="ghost" className="justify-start" onClick={() => auth.signOut()}>
+                <Button variant="ghost" className="justify-start" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     خروج
                 </Button>
