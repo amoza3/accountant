@@ -11,10 +11,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <MainSidebar appName={appName} />
       <SidebarInset className="flex-1 flex flex-col">
         <header className="flex items-center justify-between p-4 border-b md:hidden">
-          <SidebarTrigger>
-              <PanelLeft className="h-6 w-6" />
-          </SidebarTrigger>
-          <h1 className="text-lg font-semibold">{appName}</h1>
+            <h1 className="text-lg font-semibold">{appName}</h1>
+            <SidebarTrigger>
+                <PanelLeft className="h-6 w-6" />
+            </SidebarTrigger>
         </header>
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
           {children}

@@ -21,51 +21,49 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { useI18n } from '@/lib/i18n/client';
 
 export function MainSidebar({ appName }: { appName: string }) {
   const pathname = usePathname();
-  const { t } = useI18n();
 
   const menuItems = [
     {
       href: `/dashboard`,
-      label: t('sidebar.inventory'),
+      label: "موجودی کالا",
       icon: LayoutDashboard,
     },
     {
       href: `/dashboard/add-product`,
-      label: t('sidebar.add_product'),
+      label: "افزودن محصول",
       icon: PlusCircle,
     },
     {
       href: `/dashboard/record-sale`,
-      label: t('sidebar.record_sale'),
+      label: "ثبت فروش",
       icon: ShoppingCart,
     },
      {
       href: `/dashboard/sales-history`,
-      label: t('sidebar.sales_history'),
+      label: "تاریخچه فروش",
       icon: History,
     },
     {
         href: `/dashboard/customers`,
-        label: t('sidebar.customers'),
+        label: "مشتریان",
         icon: Users,
     },
     {
       href: `/dashboard/expenses`,
-      label: t('sidebar.expenses'),
+      label: "مخارج",
       icon: Receipt,
     },
     {
       href: `/dashboard/reports`,
-      label: t('sidebar.reports'),
+      label: "گزارش‌ها",
       icon: FileText,
     },
     {
       href: `/dashboard/settings`,
-      label: t('sidebar.settings'),
+      label: "تنظیمات",
       icon: Settings,
     }
   ];
@@ -73,15 +71,14 @@ export function MainSidebar({ appName }: { appName: string }) {
   const isLinkActive = (href: string) => {
     // Exact match for dashboard
     if (href.endsWith('/dashboard')) {
-      const currentPath = pathname.substring(pathname.indexOf('/dashboard'));
-      return currentPath === href;
+      return pathname === href;
     }
     // Starts with for sub-pages
-    return pathname.includes(href);
+    return pathname.startsWith(href);
   };
   
   return (
-    <Sidebar className="border-l border-r-0" dir="rtl">
+    <Sidebar className="border-l border-r-0" dir="rtl" side="right">
       <SidebarHeader className="border-b border-b-0 border-t">
         <Logo>{appName}</Logo>
       </SidebarHeader>
@@ -95,8 +92,8 @@ export function MainSidebar({ appName }: { appName: string }) {
                   tooltip={item.label}
                   className="text-right"
                 >
-                  <span className="ml-2">{item.label}</span>
-                  <item.icon />
+                  <item.icon className="ml-2" />
+                  <span>{item.label}</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
