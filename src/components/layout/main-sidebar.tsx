@@ -27,6 +27,7 @@ import {
 import { Logo } from '@/components/logo';
 import { useAppContext } from '@/components/app-provider';
 import { Button } from '../ui/button';
+import { ThemeSwitcher } from './theme-switcher';
 
 const DEV_MODE_UID = process.env.NEXT_PUBLIC_DEV_MODE_USER_UID;
 
@@ -149,6 +150,7 @@ export function MainSidebar() {
         </SidebarMenu>
       </SidebarContent>
        <SidebarFooter>
+        <ThemeSwitcher />
         {user && (
             <div className="flex flex-col gap-2 p-2">
                 <p className="text-xs text-muted-foreground px-2">وارد شده با: {user.email}</p>

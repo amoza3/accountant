@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppProvider } from '@/components/app-provider';
+import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
   title: 'حسابدار آنلاین آموزا',
@@ -29,12 +30,17 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <AppProvider>
-            <SidebarProvider>
-             {children}
-            </SidebarProvider>
-        </AppProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AppProvider>
+            <SidebarProvider>{children}</SidebarProvider>
+          </AppProvider>
           <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );
