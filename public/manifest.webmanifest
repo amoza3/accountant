@@ -1,20 +1,19 @@
 {
-  "theme_color": "#2E7D32",
-  "background_color": "#ffffff",
-  "display": "standalone",
-  "scope": "/",
+  "name": "حسابدار آنلاین آموزا",
+  "short_name": "حسابدار آموزا",
+  "description": "مدیریت ساده موجودی و فروش",
   "start_url": "/",
-  "name": "\u062d\u0633\u0627\u0628\u062f\u0627\u0631 \u0622\u0646\u0644\u0627\u06cc\u0646 \u0622\u0645\u0648\u0632\u0627",
-  "short_name": "Amooza Accountant",
-  "description": "\u0645\u062f\u06cc\u0631\u06cc\u062a \u0633\u0627\u062f\u0647 \u0645\u0648\u062c\u0648\u062f\u06cc",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2E7D32",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "https://picsum.photos/192/192",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "https://picsum.photos/512/512",
       "sizes": "512x512",
       "type": "image/png"
     }
