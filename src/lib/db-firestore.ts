@@ -1,6 +1,6 @@
 'use client';
 
-import { getDb, getStorageInstance } from './firebase';
+import { getDb } from './firebase';
 import {
     collection,
     doc,
@@ -13,7 +13,6 @@ import {
     query,
     where
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AttachmentSource } from '@/lib/types';
 import type { DataProvider } from './dataprovider';
 import { calculateTotalCostInToman } from './utils';
@@ -182,18 +181,12 @@ export const FirestoreDataProvider: DataProvider = {
     const batch = writeBatch(db);
     const expenseId = Date.now().toString();
     
-    const attachmentIds = await Promise.all(attachments.map(async (att) => {
+    const attachmentIds = attachments.map((att) => {
         const attachmentId = Date.now().toString() + Math.random();
-        let receiptImageURL = att.receiptImage;
-        if (receiptImageURL && receiptImageURL.startsWith('data:')) {
-           const blob = await (await fetch(receiptImageURL)).blob();
-           receiptImageURL = await FirestoreDataProvider.uploadFile(new File([blob], "receipt.png"));
-        }
-        
-        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expenseId, sourceType: 'expense', receiptImage: receiptImageURL };
+        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expenseId, sourceType: 'expense' };
         batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
         return attachmentId;
-    }));
+    });
 
     const newExpense: Expense = { ...expense, id: expenseId, attachmentIds };
     batch.set(doc(db, EXPENSES_COLLECTION, expenseId), newExpense);
@@ -207,17 +200,12 @@ export const FirestoreDataProvider: DataProvider = {
         batch.delete(doc(db, ATTACHMENTS_COLLECTION, id));
     });
 
-    const newAttachmentIds = await Promise.all(newAttachments.map(async (att) => {
+    const newAttachmentIds = newAttachments.map((att) => {
         const attachmentId = Date.now().toString() + Math.random();
-        let receiptImageURL = att.receiptImage;
-        if (receiptImageURL && receiptImageURL.startsWith('data:')) {
-           const blob = await (await fetch(receiptImageURL)).blob();
-           receiptImageURL = await FirestoreDataProvider.uploadFile(new File([blob], "receipt.png"));
-        }
-        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expense.id, sourceType: 'expense', receiptImage: receiptImageURL };
+        const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: expense.id, sourceType: 'expense' };
         batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
         return attachmentId;
-    }));
+    });
     
     const finalAttachmentIds = (expense.attachmentIds || [])
       .filter(id => !deletedAttachmentIds.includes(id))
@@ -356,11 +344,9 @@ export const FirestoreDataProvider: DataProvider = {
     return querySnapshot.docs.map(doc => doc.data() as Attachment);
   },
   uploadFile: async (file: File): Promise<string> => {
-    const storage = getStorageInstance();
-    const storageRef = ref(storage, `attachments/${Date.now()}-${file.name}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
+     // This function is not used when storing as Base64.
+     // It's kept for potential future use or if other parts of the app need file uploads.
+    return Promise.reject(new Error("File upload to Firebase Storage is disabled."));
   },
   
   // Payment Operations
@@ -369,23 +355,17 @@ export const FirestoreDataProvider: DataProvider = {
     const batch = writeBatch(db);
     const paymentId = Date.now().toString() + Math.random();
     
-    const attachmentIds = await Promise.all(attachments.map(async (att) => {
+    const attachmentIds = attachments.map((att) => {
         const attachmentId = Date.now().toString() + Math.random();
-         let receiptImageURL = att.receiptImage;
-        if (receiptImageURL && receiptImageURL.startsWith('data:')) {
-           const blob = await (await fetch(receiptImageURL)).blob();
-           receiptImageURL = await FirestoreDataProvider.uploadFile(new File([blob], "receipt.png"));
-        }
         const newAttachment: Attachment = {
             ...att,
             id: attachmentId,
             sourceId: paymentId,
             sourceType: 'payment',
-            receiptImage: receiptImageURL,
         };
         batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
         return attachmentId;
-    }));
+    });
 
     const newPayment: Payment = {
         ...paymentData,
