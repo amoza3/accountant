@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -33,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { StorageType } from '@/components/app-provider';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const exchangeRatesSchema = z.object({
   rates: z.array(
@@ -71,6 +71,8 @@ function ExchangeRatesForm() {
       rates: [],
     },
   });
+
+  const { formState: { isSubmitting } } = form;
 
   useEffect(() => {
     if (!db) return;
@@ -116,9 +118,9 @@ function ExchangeRatesForm() {
             )}
           />
         ))}
-        <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-          {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {form.formState.isSubmitting ? "در حال ذخیره..." : "ذخیره نرخ‌ها"}
+        <Button type="submit" disabled={isSubmitting || !db}>
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isSubmitting ? "در حال ذخیره..." : "ذخیره نرخ‌ها"}
         </Button>
       </form>
     </Form>
@@ -133,6 +135,8 @@ function CostTitlesForm() {
     resolver: zodResolver(costTitleSchema),
     defaultValues: { title: '' },
   });
+
+  const { formState: { isSubmitting } } = form;
 
   const fetchCostTitles = useCallback(async () => {
     if (!db) return;
@@ -195,9 +199,9 @@ function CostTitlesForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-            {form.formState.isSubmitting ? "در حال افزودن..." : "افزودن"}
+          <Button type="submit" disabled={isSubmitting || !db}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+            {isSubmitting ? "در حال افزودن..." : "افزودن"}
           </Button>
         </form>
       </Form>
@@ -230,6 +234,8 @@ function EmployeeForm() {
     resolver: zodResolver(employeeSchema),
     defaultValues: { name: '', position: '', salary: 0 },
   });
+
+  const { formState: { isSubmitting } } = form;
 
   const fetchEmployees = useCallback(async () => {
     if (!db) return;
@@ -320,9 +326,9 @@ function EmployeeForm() {
                     )}
                 />
            </div>
-          <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-            {form.formState.isSubmitting ? "در حال افزودن..." : "افزودن کارمند"}
+          <Button type="submit" disabled={isSubmitting || !db}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+            {isSubmitting ? "در حال افزودن..." : "افزودن کارمند"}
           </Button>
         </form>
       </Form>
@@ -390,96 +396,6 @@ function StorageSettingsForm() {
     );
 }
 
-const defaultConfig: FirebaseConfig = {
-    projectId: 'easystock-wlf7q',
-    appId: '1:757179151003:web:a83f3727b9373d0b400c3e',
-    storageBucket: 'easystock-wlf7q.appspot.com',
-    apiKey: 'AIzaSyD2e_mFdDS8H0ltLT-W4vw57isQfPvzZz4',
-    authDomain: 'easystock-wlf7q.firebaseapp.com',
-    messagingSenderId: '757179151003',
-};
-
-function FirebaseSettingsForm() {
-    const { toast } = useToast();
-    
-    const form = useForm<FirebaseConfig>({
-        resolver: zodResolver(firebaseConfigSchema),
-        defaultValues: defaultConfig,
-    });
-
-    useEffect(() => {
-        const savedConfig = localStorage.getItem('firebaseConfig');
-        if (savedConfig) {
-            form.reset(JSON.parse(savedConfig));
-        } else {
-            form.reset(defaultConfig);
-        }
-    }, [form]);
-
-    const onSubmit = (data: FirebaseConfig) => {
-        localStorage.setItem('firebaseConfig', JSON.stringify(data));
-        toast({
-            title: 'تنظیمات ذخیره شد',
-            description: 'تنظیمات Firebase با موفقیت ذخیره شد. برنامه مجدداً بارگذاری می‌شود.'
-        });
-        // Optionally, force a reload to apply the new config
-        setTimeout(() => window.location.reload(), 1500);
-    };
-
-    return (
-        <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="projectId" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Project ID</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                 <FormField control={form.control} name="appId" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>App ID</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                 <FormField control={form.control} name="apiKey" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>API Key</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField control={form.control} name="authDomain" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Auth Domain</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField control={form.control} name="storageBucket" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Storage Bucket</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                 <FormField control={form.control} name="messagingSenderId" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Messaging Sender ID</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                 <Button type="submit" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {form.formState.isSubmitting ? "در حال ذخیره..." : "ذخیره تغییرات"}
-                </Button>
-            </form>
-        </Form>
-    );
-}
-
 export default function SettingsPage() {
   const { isLoading } = useAppContext();
   
@@ -515,10 +431,6 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-8">
                     <StorageSettingsForm />
-                    <Separator />
-                    <h3 className="text-lg font-medium">تنظیمات اتصال Firebase</h3>
-                    <p className="text-sm text-muted-foreground">اگر از حالت ذخیره‌سازی ابری استفاده می‌کنید، مشخصات پروژه Firebase خود را در این قسمت وارد کنید.</p>
-                    <FirebaseSettingsForm />
                 </CardContent>
             </Card>
         </TabsContent>
@@ -565,5 +477,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
