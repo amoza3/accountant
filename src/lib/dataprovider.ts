@@ -53,6 +53,8 @@ export interface DataProvider {
   addPayment: (paymentData: Omit<Payment, 'id' | 'attachmentIds'>, attachments: Omit<Attachment, 'id'| 'sourceId' | 'sourceType'>[]) => Promise<string>;
   getPaymentsByIds: (ids: string[]) => Promise<Payment[]>;
 
-  // Admin operations
+  // User Profile Operations
+  getUserProfile: (userId: string) => Promise<UserProfile | null>;
+  saveUserProfile: (profile: UserProfile) => Promise<void>;
   getAllUsers: () => Promise<UserProfile[]>;
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AppSettings, UserProfile } from '@/lib/types';
@@ -7,7 +8,7 @@ import type { DataProvider } from './dataprovider';
 
 
 const DB_NAME = 'EasyStockDB';
-const DB_VERSION = 11;
+const DB_VERSION = 12; // Incremented version
 const PRODUCT_STORE = 'products';
 const SALE_STORE = 'sales';
 const SETTINGS_STORE = 'settings';
@@ -18,6 +19,7 @@ const RECURRING_EXPENSE_STORE = 'recurringExpenses';
 const EMPLOYEE_STORE = 'employees';
 const ATTACHMENT_STORE = 'attachments';
 const PAYMENT_STORE = 'payments';
+const USER_PROFILE_STORE = 'userProfiles'; // New store for user profiles
 
 
 let db: IDBDatabase;
@@ -72,6 +74,9 @@ const openDB = (): Promise<IDBDatabase> => {
       }
        if (!db.objectStoreNames.contains(PAYMENT_STORE)) {
         db.createObjectStore(PAYMENT_STORE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(USER_PROFILE_STORE)) {
+        db.createObjectStore(USER_PROFILE_STORE, { keyPath: 'id' });
       }
     };
   });
@@ -674,8 +679,25 @@ export const IndexedDBDataProvider: DataProvider = {
   uploadFile: async (file) => {
     return fileToBase64(file);
   },
+  getUserProfile: (userId: string): Promise<UserProfile | null> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(USER_PROFILE_STORE, 'readonly');
+        const request = store.get(userId);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+  },
+  saveUserProfile: (profile: UserProfile): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+        const db = await openDB();
+        const store = getStore(USER_PROFILE_STORE, 'readwrite');
+        const request = store.put(profile);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+  },
   getAllUsers: async (): Promise<UserProfile[]> => {
-    // This is a Firestore-specific feature. For IndexedDB, we can only return the current user.
     return Promise.resolve([]);
   },
 };

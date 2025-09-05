@@ -43,39 +43,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({ shopName: 'ایزی استاک' });
 
   useEffect(() => {
-    if (DEV_MODE_UID) {
-      console.log(`[DEV MODE] Mocking user with UID: ${DEV_MODE_UID}`);
-      const isSuperAdmin = DEV_MODE_UID === SUPER_ADMIN_UID;
-      setUser({
-        id: DEV_MODE_UID,
-        email: isSuperAdmin ? 'superadmin@example.com' : 'dev@example.com',
-        displayName: isSuperAdmin ? 'Super Admin' : 'Dev User',
-        role: isSuperAdmin ? 'superadmin' : 'user',
-      });
-      setAuthLoading(false);
-      return;
-    }
+    const savedProvider = (localStorage.getItem('storageType') as StorageType) || 'local';
+    setStorageType(savedProvider);
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-          setUser({
-              id: currentUser.uid,
-              email: currentUser.email,
-              displayName: currentUser.displayName,
-              role: currentUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user'
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (DEV_MODE_UID && savedProvider === 'local') {
+         console.log(`[DEV MODE] Bypassing auth and using mock user with UID: ${DEV_MODE_UID}`);
+         setUser({
+            id: DEV_MODE_UID,
+            email: 'dev@example.com',
+            displayName: 'Dev User',
+            role: 'superadmin', // Dev user is always superadmin for local testing
           });
+          setAuthLoading(false);
+          return;
+      }
+
+      if (currentUser) {
+          const dbInstance = savedProvider === 'cloud' ? FirestoreDataProvider(currentUser.uid, false) : IndexedDBDataProvider;
+          const userProfile = await dbInstance.getUserProfile(currentUser.uid);
+           if (userProfile) {
+              setUser(userProfile);
+          } else {
+              // Create a profile if it doesn't exist.
+              const newUserProfile: UserProfile = {
+                  id: currentUser.uid,
+                  email: currentUser.email,
+                  displayName: currentUser.displayName,
+                  role: currentUser.uid === SUPER_ADMIN_UID ? 'superadmin' : 'user'
+              };
+              await dbInstance.saveUserProfile(newUserProfile);
+              setUser(newUserProfile);
+          }
       } else {
           setUser(null);
       }
       setAuthLoading(false);
     });
-    return () => unsubscribe();
-  }, []);
 
-  useEffect(() => {
-    const savedProvider = (localStorage.getItem('storageType') as StorageType) || 'local';
-    setStorageType(savedProvider);
-  }, []);
+    return () => unsubscribe();
+  }, [storageType]);
+
 
   useEffect(() => {
     async function initializeProvider() {
@@ -83,11 +91,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setGlobalLoading(true);
       let provider: DataProvider;
       
-      const currentUserId = DEV_MODE_UID || user?.id;
+      const currentUserId = user?.id;
 
       if (storageType === 'cloud') {
         if (currentUserId) {
-            const isSuperAdmin = currentUserId === SUPER_ADMIN_UID;
+            const isSuperAdmin = user.role === 'superadmin';
             provider = FirestoreDataProvider(currentUserId, isSuperAdmin);
         } else if (!authLoading) {
             setIsDbLoading(false);
@@ -100,14 +108,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         provider = IndexedDBDataProvider;
       }
       
-      const appSettings = await provider.getAppSettings();
-      setSettings(appSettings);
+      try {
+        const appSettings = await provider.getAppSettings();
+        setSettings(appSettings);
+      } catch (e) {
+        console.error("Failed to fetch app settings:", e);
+      }
+      
       setDataProvider(() => provider);
       setIsDbLoading(false);
       setGlobalLoading(false);
     }
 
-    initializeProvider();
+    if (!authLoading) {
+        initializeProvider();
+    }
+    
   }, [storageType, user, authLoading]);
   
   const changeStorageType = useCallback((newType: StorageType) => {

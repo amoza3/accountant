@@ -1,3 +1,4 @@
+
 'use client';
 
 import { getDb } from './firebase';
@@ -400,7 +401,18 @@ export const FirestoreDataProvider = (userId: string, isSuperAdmin: boolean): Da
       const paymentDocs = await Promise.all(paymentPromises);
       return paymentDocs.filter(doc => doc.exists()).map(doc => doc.data() as Payment);
     },
-    // Super Admin Operations
+
+    // User Profile Operations
+    getUserProfile: async (profileId: string) => {
+        const db = getDb();
+        const docRef = doc(db, ROOT_COLLECTION, profileId);
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists() ? (docSnap.data() as UserProfile) : null;
+    },
+    saveUserProfile: async (profile) => {
+        const db = getDb();
+        await setDoc(doc(db, ROOT_COLLECTION, profile.id), profile, { merge: true });
+    },
     getAllUsers: async () => {
         if (!isSuperAdmin) {
             return [];
@@ -410,13 +422,13 @@ export const FirestoreDataProvider = (userId: string, isSuperAdmin: boolean): Da
         const userProfiles: UserProfile[] = [];
 
         for (const userDoc of usersSnapshot.docs) {
-            const settingsDoc = await getDoc(doc(db, getCollectionPath('settings', userDoc.id), 'appSettings'));
-            const shopName = settingsDoc.exists() ? (settingsDoc.data() as AppSettings).shopName : 'نامشخص';
+            const userProfile = userDoc.data() as UserProfile;
+             const settingsDoc = await getDoc(doc(db, getCollectionPath('settings', userDoc.id), 'appSettings'));
+             const shopName = settingsDoc.exists() ? (settingsDoc.data() as AppSettings).shopName : userProfile.displayName || 'بدون نام';
+
             userProfiles.push({
-                id: userDoc.id,
-                role: 'user',
-                displayName: shopName, // Using shop name as display name for admin panel
-                email: 'نامشخص' // email is not stored in user collection
+                ...userProfile,
+                displayName: shopName,
             });
         }
         return userProfiles;
