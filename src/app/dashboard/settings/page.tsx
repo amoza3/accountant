@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Trash2, PlusCircle, Users, Database } from 'lucide-react';
+import { Trash2, PlusCircle, Users, Database, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -115,7 +114,8 @@ function ExchangeRatesForm() {
           />
         ))}
         <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-          ذخیره نرخ‌ها
+          {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {form.formState.isSubmitting ? "در حال ذخیره..." : "ذخیره نرخ‌ها"}
         </Button>
       </form>
     </Form>
@@ -191,7 +191,8 @@ function CostTitlesForm() {
             )}
           />
           <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            <PlusCircle className="mr-2" /> افزودن
+            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+            {form.formState.isSubmitting ? "در حال افزودن..." : "افزودن"}
           </Button>
         </form>
       </Form>
@@ -313,7 +314,8 @@ function EmployeeForm() {
                 />
            </div>
           <Button type="submit" disabled={form.formState.isSubmitting || !db}>
-            <PlusCircle className="mr-2" /> افزودن کارمند
+            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+            {form.formState.isSubmitting ? "در حال افزودن..." : "افزودن کارمند"}
           </Button>
         </form>
       </Form>
@@ -462,7 +464,10 @@ function FirebaseSettingsForm() {
                         <FormMessage />
                     </FormItem>
                 )} />
-                <Button type="submit">ذخیره تغییرات</Button>
+                 <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {form.formState.isSubmitting ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                </Button>
             </form>
         </Form>
     );
@@ -539,5 +544,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

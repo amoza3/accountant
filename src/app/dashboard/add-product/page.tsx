@@ -5,7 +5,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useForm, useFieldArray, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Barcode, PlusCircle, Trash2 } from 'lucide-react';
+import { Barcode, PlusCircle, Trash2, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -333,7 +333,7 @@ export default function AddProductPage() {
 
 
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || !db}>
-                <PlusCircle className="mr-2 h-4 w-4" />
+                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
                 {form.formState.isSubmitting ? "در حال افزودن..." : "افزودن محصول"}
               </Button>
             </form>

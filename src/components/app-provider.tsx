@@ -11,6 +11,8 @@ export type StorageType = 'local' | 'cloud';
 interface AppContextValue {
   db: DataProvider | null;
   isLoading: boolean;
+  isGlobalLoading: boolean;
+  setGlobalLoading: (isLoading: boolean) => void;
   storageType: StorageType;
   changeStorageType: (newType: StorageType) => void;
 }
@@ -21,6 +23,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [storageType, setStorageType] = useState<StorageType>('local');
   const [dataProvider, setDataProvider] = useState<DataProvider | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGlobalLoading, setGlobalLoading] = useState(false);
 
   useEffect(() => {
     // Determine storage type from localStorage on mount
@@ -31,6 +34,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function initializeProvider() {
       setIsLoading(true);
+      setGlobalLoading(true);
       let provider: DataProvider;
 
       if (storageType === 'cloud') {
@@ -43,6 +47,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       
       setDataProvider(() => provider);
       setIsLoading(false);
+      setGlobalLoading(false);
     }
 
     initializeProvider();
@@ -56,9 +61,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const contextValue = useMemo(() => ({
     db: dataProvider,
     isLoading,
+    isGlobalLoading,
+    setGlobalLoading,
     storageType,
     changeStorageType,
-  }), [dataProvider, isLoading, storageType, changeStorageType]);
+  }), [dataProvider, isLoading, isGlobalLoading, storageType, changeStorageType]);
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }
