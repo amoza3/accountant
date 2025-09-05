@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw, Paperclip, Pencil } from 'lucide-react';
+import { PlusCircle, Trash2, Receipt, Repeat, RefreshCw, Paperclip, Pencil, Loader2 } from 'lucide-react';
 import type { Expense, RecurringExpense, RecurringExpenseFrequency, Attachment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,6 +45,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAppContext } from '@/components/app-provider';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const attachmentSchema = z.object({
   description: z.string().optional(),
@@ -152,7 +153,9 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                         </Button>
                     </div>
                 )}
-                 <Button type="submit">افزودن سند</Button>
+                <DialogClose asChild>
+                    <Button type="submit">افزودن سند</Button>
+                </DialogClose>
             </form>
         </Form>
     );
@@ -170,6 +173,8 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
         date: expenseToEdit.date.slice(0, 16)
     } : { title: '', amount: 0, date: new Date().toISOString().slice(0, 16) },
   });
+
+  const { formState: { isSubmitting } } = form;
   
   useEffect(() => {
     if (expenseToEdit) {
@@ -290,9 +295,9 @@ function ExpenseForm({ onExpenseAdded, expenseToEdit, onExpenseUpdated }: { onEx
                 </Dialog>
             </div>
 
-            <Button type="submit" className="w-full">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              {expenseToEdit ? 'ذخیره تغییرات' : 'ثبت هزینه'}
+            <Button type="submit" className="w-full" disabled={isSubmitting || !db}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+              {isSubmitting ? "در حال ثبت..." : (expenseToEdit ? 'ذخیره تغییرات' : 'ثبت هزینه')}
             </Button>
           </form>
         </Form>
@@ -313,13 +318,17 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
     };
 
     useEffect(() => {
-        fetchRecurringExpenses();
+        if (db) {
+            fetchRecurringExpenses();
+        }
     }, [db]);
 
     const form = useForm<z.infer<typeof recurringExpenseSchema>>({
         resolver: zodResolver(recurringExpenseSchema),
         defaultValues: { title: '', amount: 0, startDate: new Date().toISOString().split('T')[0] },
     });
+    
+    const { formState: { isSubmitting } } = form;
 
     const onSubmit = async (data: z.infer<typeof recurringExpenseSchema>) => {
         if (!db) return;
@@ -423,9 +432,9 @@ function RecurringExpenseForm({ onRecurringExpenseAdded }: { onRecurringExpenseA
                         )}
                         />
                 </div>
-                <Button type="submit" className="w-full">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                افزودن هزینه دوره‌ای
+                <Button type="submit" className="w-full" disabled={isSubmitting || !db}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                    {isSubmitting ? "در حال افزودن..." : "افزودن هزینه دوره‌ای"}
                 </Button>
             </form>
             </Form>
@@ -561,13 +570,14 @@ function ExpenseListItem({ expense, onUpdate }: { expense: Expense & { attachmen
 }
 
 export default function ExpensesPage() {
-  const { db } = useAppContext();
+  const { db, isLoading, setGlobalLoading } = useAppContext();
   const [expenses, setExpenses] = useState<(Expense & { attachments: Attachment[] })[]>([]);
   const [isProcessingRecurring, setIsProcessingRecurring] = useState(false);
   const { toast } = useToast();
 
   const fetchExpenses = async () => {
     if (!db) return;
+    setGlobalLoading(true);
     try {
         const allExpenses = await db.getAllExpenses();
         const expensesWithAttachments = await Promise.all(allExpenses.map(async (exp) => {
@@ -581,6 +591,8 @@ export default function ExpensesPage() {
             title: 'خطا',
             description: 'بارگذاری لیست مخارج ناموفق بود.',
         });
+    } finally {
+        setGlobalLoading(false);
     }
   };
   
@@ -618,6 +630,21 @@ export default function ExpensesPage() {
         fetchExpenses();
     }
   }, [db]);
+  
+   if (isLoading) {
+    return (
+      <div className="grid md:grid-cols-3 gap-8">
+        <div className="md:col-span-1 space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-96 w-full" />
+        </div>
+        <div className="md:col-span-2 space-y-4">
+            <Skeleton className="h-10 w-1/2" />
+            <Skeleton className="h-[70vh] w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid md:grid-cols-3 gap-8">

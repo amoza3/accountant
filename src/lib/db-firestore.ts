@@ -350,6 +350,7 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
       return querySnapshot.docs.map(doc => doc.data() as Attachment);
     },
     uploadFile: async (file: File): Promise<string> => {
+        // This is now simplified to just convert to base64, no Storage upload
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -366,8 +367,8 @@ export const FirestoreDataProvider = (userId: string): DataProvider => {
       
       const attachmentIds = await Promise.all(attachments.map(async (att) => {
           const attachmentId = Date.now().toString() + Math.random();
-          const receiptImage = att.receiptImage ? await FirestoreDataProvider(userId).uploadFile(att.receiptImage as unknown as File) : undefined;
-          const newAttachment: Attachment = { ...att, receiptImage, id: attachmentId, sourceId: paymentId, sourceType: 'payment' };
+          // No upload, just pass base64 string
+          const newAttachment: Attachment = { ...att, id: attachmentId, sourceId: paymentId, sourceType: 'payment' };
           batch.set(doc(db, ATTACHMENTS_COLLECTION, attachmentId), newAttachment);
           return attachmentId;
       }));
