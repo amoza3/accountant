@@ -8,6 +8,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 export const metadata: Metadata = {
   title: 'حسابدار آنلاین آموزا',
   description: 'مدیریت ساده موجودی',
+  manifest: '/manifest.webmanifest',
 };
 
 export default function RootLayout({
@@ -28,6 +29,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <meta name="theme-color" content="#2E7D32" />
       </head>
       <body className="font-body antialiased">
         <ThemeProvider
