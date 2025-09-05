@@ -20,6 +20,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
+import type { SaleItem, Product, Customer, Payment, Attachment, PaymentMethod } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
+import { useRouter } from 'next/navigation';
+import { useAppContext } from '@/components/app-provider';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+    Command,
+    CommandInput,
+    CommandItem,
+    CommandList,
+  } from '@/components/ui/command';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -28,28 +47,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-    Command,
-    CommandInput,
-    CommandItem,
-    CommandList,
-  } from '@/components/ui/command';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import { useToast } from '@/hooks/use-toast';
-import type { SaleItem, Customer, PaymentMethod, Product, Payment, Attachment } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
-import { useRouter } from 'next/navigation';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { CURRENCY_SYMBOLS } from '@/lib/utils';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import {
     Form,
     FormControl,
     FormField,
@@ -57,10 +54,18 @@ import {
     FormLabel,
     FormMessage,
 } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { useAppContext } from '@/components/app-provider';
+import { CURRENCY_SYMBOLS } from '@/lib/utils';
 
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+    CASH: 'نقد',
+    CARD: 'کارتخوان',
+    ONLINE: 'آنلاین',
+};
 
 const attachmentSchema = z.object({
   date: z.string().min(1, 'تاریخ سند الزامی است'),
@@ -74,12 +79,6 @@ const paymentFormSchema = z.object({
   method: z.enum(['CASH', 'CARD', 'ONLINE']),
   date: z.string().min(1, 'تاریخ پرداخت الزامی است'),
 });
-
-const paymentMethodLabels: Record<PaymentMethod, string> = {
-    CASH: 'نقد',
-    CARD: 'کارتخوان',
-    ONLINE: 'آنلاین',
-};
 
 function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void }) {
     const form = useForm<z.infer<typeof attachmentSchema>>({
@@ -273,12 +272,12 @@ export default function RecordSalePage() {
     if (!db) return;
     barcodeRef.current?.focus();
     async function fetchData() {
-        const [customers, products] = await Promise.all([
+        const [customersData, productsData] = await Promise.all([
             db.getAllCustomers(),
             db.getAllProducts()
         ]);
-        setCustomers(customers);
-        setAllProducts(products);
+        setCustomers(customersData);
+        setAllProducts(productsData);
     }
     fetchData();
   }, [db]);
@@ -589,7 +588,7 @@ export default function RecordSalePage() {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button className="w-full" size="lg" onClick={completeSale}>
+                    <Button className="w-full" size="lg" onClick={completeSale} disabled={!db}>
                     <ShoppingCart className="mr-2 h-5 w-5" /> تکمیل فروش
                     </Button>
                 </CardFooter>

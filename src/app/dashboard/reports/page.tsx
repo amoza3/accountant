@@ -2,15 +2,18 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
-import type { Sale, Expense, Payment } from '@/lib/types';
+import { generateInventoryRecommendations } from '@/ai/flows/generate-inventory-recommendations';
+import type { Product, Sale, Expense, Payment } from '@/lib/types';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CURRENCY_SYMBOLS } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppContext } from '@/components/app-provider';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CURRENCY_SYMBOLS } from '@/lib/utils';
+import { Bot, Sparkles } from 'lucide-react';
 
 type TimeRange = 'all' | 'last_year' | 'this_year' | 'last_month' | 'this_month' | 'last_week' | 'this_week';
 
@@ -23,6 +26,8 @@ type ChartData = {
 };
 
 export default function ReportsPage() {
+  const [recommendations, setRecommendations] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -36,7 +41,7 @@ export default function ReportsPage() {
     async function fetchData() {
       setIsLoading(true);
       try {
-        const [allSales, allExpenses] = await Promise.all([db.getAllSales(), db.getAllExpenses()]);
+        const [allSales, allExpenses, allProducts] = await Promise.all([db.getAllSales(), db.getAllExpenses(), db.getAllProducts()]);
         const paymentIds = allSales.flatMap(s => s.paymentIds || []);
         const allPayments = await db.getPaymentsByIds(paymentIds);
         setSales(allSales);
@@ -45,8 +50,8 @@ export default function ReportsPage() {
       } catch (error) {
         toast({
           variant: 'destructive',
-          title: 'خطا',
-          description: 'بارگذاری تاریخچه فروش یا مخارج ناموفق بود.',
+          title: 'خطا در بارگذاری داده',
+          description: 'بارگذاری اطلاعات فروش و مخارج با مشکل مواجه شد.',
         });
       } finally {
         setIsLoading(false);
@@ -54,6 +59,49 @@ export default function ReportsPage() {
     }
     fetchData();
   }, [toast, db]);
+  
+  const handleGenerateReport = async () => {
+    if (!db) return;
+    setIsAiLoading(true);
+    setRecommendations('');
+    try {
+      const products: Product[] = await db.getAllProducts();
+      const salesData: Sale[] = await db.getAllSales();
+
+      if (products.length === 0 || salesData.length === 0) {
+        toast({
+          variant: 'default',
+          title: 'داده کافی نیست',
+          description: 'برای تولید گزارش هوشمند، به داده‌های بیشتری از فروش و موجودی نیاز است.',
+        });
+        setIsAiLoading(false);
+        return;
+      }
+
+      const stockLevels = JSON.stringify(
+        products.map((p) => ({ name: p.name, quantity: p.quantity, lowStockThreshold: p.lowStockThreshold }))
+      );
+
+      const salesSummary = salesData.flatMap(s => s.items).reduce((acc, item) => {
+        acc[item.productName] = (acc[item.productName] || 0) + item.quantity;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const salesDataString = JSON.stringify(salesSummary);
+
+      const result = await generateInventoryRecommendations({ salesData: salesDataString, stockLevels });
+      setRecommendations(result.recommendations);
+    } catch (error) {
+      console.error('Failed to generate recommendations:', error);
+      toast({
+        variant: 'destructive',
+        title: 'خطا در تولید گزارش',
+        description: 'متاسفانه تولید گزارش هوشمند با مشکل مواجه شد.',
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   const { filteredSales, filteredExpenses } = useMemo(() => {
     const now = new Date();
@@ -193,6 +241,16 @@ export default function ReportsPage() {
         </Card>
   );
 
+  const timeRangeLabels: Record<TimeRange, string> = {
+    this_week: 'هفته جاری',
+    last_week: 'هفته گذشته',
+    this_month: 'ماه جاری',
+    last_month: 'ماه گذشته',
+    this_year: 'سال جاری',
+    last_year: 'سال گذشته',
+    all: 'کل بازه',
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
@@ -200,16 +258,12 @@ export default function ReportsPage() {
         <div className="w-48">
             <Select value={timeRange} onValueChange={(value: TimeRange) => setTimeRange(value)}>
                 <SelectTrigger>
-                    <SelectValue placeholder="بازه زمانی" />
+                    <SelectValue placeholder="انتخاب بازه زمانی" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="this_week">هفته جاری</SelectItem>
-                    <SelectItem value="last_week">هفته گذشته</SelectItem>
-                    <SelectItem value="this_month">ماه جاری</SelectItem>
-                    <SelectItem value="last_month">ماه گذشته</SelectItem>
-                    <SelectItem value="this_year">سال جاری</SelectItem>
-                    <SelectItem value="last_year">سال گذشته</SelectItem>
-                    <SelectItem value="all">کل</SelectItem>
+                    {Object.entries(timeRangeLabels).map(([key, label]) => (
+                         <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
                 </SelectContent>
             </Select>
         </div>
@@ -285,6 +339,54 @@ export default function ReportsPage() {
              <div className="grid gap-8">
                 {renderChart(chartData, 'نمودار جامع فروش، سود و مخارج')}
             </div>
+             <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-primary/10 text-primary">
+                        <Bot className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <CardTitle>دستیار هوشمند انبار</CardTitle>
+                        <CardDescription>
+                        برای دریافت پیشنهادهای هوشمند درباره وضعیت موجودی و فروش کلیک کنید.
+                        </CardDescription>
+                    </div>
+                </div>
+                <Button onClick={handleGenerateReport} disabled={isAiLoading}>
+                    {isAiLoading ? (
+                        'در حال تولید...'
+                    ) : (
+                        <>
+                        <Sparkles className="mr-2 h-4 w-4" /> تولید گزارش
+                        </>
+                    )}
+                    </Button>
+                </CardHeader>
+                <CardContent className="min-h-[200px] prose prose-sm max-w-none dark:prose-invert">
+                {isAiLoading && (
+                    <div className="space-y-4">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-[75%]" />
+                    </div>
+                )}
+                {!isAiLoading && recommendations && (
+                    <div dangerouslySetInnerHTML={{ __html: recommendations.replace(/\n/g, '<br />') }} />
+                )}
+                {!isAiLoading && !recommendations && (
+                    <div className="flex flex-1 items-center justify-center rounded-lg h-[200px]">
+                        <div className="flex flex-col items-center gap-1 text-center">
+                            <h3 className="text-2xl font-bold tracking-tight">
+                            آماده برای تحلیل
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                            برای شروع، روی دکمه "تولید گزارش" کلیک کنید.
+                            </p>
+                        </div>
+                    </div>
+                )}
+                </CardContent>
+            </Card>
         </>
         ) : (
             <Card>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
@@ -37,6 +38,7 @@ import { useRouter } from 'next/navigation';
 import { calculateSellingPrice, CURRENCY_SYMBOLS, calculateTotalCostInToman } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { useAppContext } from '@/components/app-provider';
+import Link from 'next/link';
 
 const productSchema = z.object({
   id: z.string().min(1, 'بارکد الزامی است'),
@@ -140,7 +142,7 @@ export default function AddProductPage() {
       });
     }
   };
-  
+
   const totalCost = calculateTotalCostInToman(watchedValues.costs as ProductCost[], exchangeRates);
 
   return (
@@ -165,12 +167,12 @@ export default function AddProductPage() {
                       <FormLabel>بارکد (شناسه)</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Barcode className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                          <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                           <Input
                             placeholder="بارکد را اسکن یا وارد کنید"
                             {...field}
                             ref={barcodeRef}
-                            className="pr-10"
+                            className="pl-10"
                           />
                         </div>
                       </FormControl>
@@ -295,7 +297,7 @@ export default function AddProductPage() {
                 </Button>
                 {costTitles.length === 0 && (
                     <FormDescription>
-                        هنوز هیچ عنوان هزینه‌ای تعریف نکرده‌اید. لطفا در <a href={`/dashboard/settings`} className="underline">صفحه تنظیمات</a> اضافه کنید.
+                        هنوز هیچ عنوان هزینه‌ای تعریف نکرده‌اید. لطفا در <Link href={`/dashboard/settings`} className="underline">صفحه تنظیمات</Link> اضافه کنید.
                     </FormDescription>
                 )}
               </div>
@@ -330,7 +332,7 @@ export default function AddProductPage() {
                 </div>
 
 
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || !db}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 {form.formState.isSubmitting ? "در حال افزودن..." : "افزودن محصول"}
               </Button>

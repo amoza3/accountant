@@ -7,12 +7,10 @@ import { getDb } from '@/lib/firebase';
 import { useAppContext } from '@/components/app-provider';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useI18n } from '@/lib/i18n/client';
 
 export function FirebaseStatusIndicator() {
   const { storageType } = useAppContext();
   const [isOnline, setIsOnline] = useState(true);
-  const { t } = useI18n();
 
   useEffect(() => {
     if (storageType !== 'cloud') {
@@ -53,7 +51,7 @@ export function FirebaseStatusIndicator() {
         </TooltipTrigger>
         <TooltipContent side="top" align="center">
           <p>
-            {isOnline ? t('status.firestore_connected') : t('status.firestore_disconnected')}
+            {isOnline ? 'متصل به فضای ابری' : 'اتصال به فضای ابری قطع شد'}
           </p>
         </TooltipContent>
       </Tooltip>

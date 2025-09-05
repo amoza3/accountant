@@ -24,7 +24,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { SaleItem, Product, Customer, Payment, Attachment, PaymentMethod } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
-import { useI18n, useCurrentLocale } from '@/lib/i18n/client';
 import { useAppContext } from '@/components/app-provider';
 import {
     Popover,
@@ -82,7 +81,6 @@ const paymentFormSchema = z.object({
 });
 
 function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<typeof attachmentSchema>) => void }) {
-    const { t } = useI18n();
     const form = useForm<z.infer<typeof attachmentSchema>>({
         resolver: zodResolver(attachmentSchema),
         defaultValues: { description: '', receiptNumber: '', receiptImage: '', date: new Date().toISOString().slice(0, 16) },
@@ -116,7 +114,7 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                     name="date"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>{t('expenses.attachment_form.date_label')}</FormLabel>
+                        <FormLabel>تاریخ و ساعت سند</FormLabel>
                         <FormControl>
                             <Input type="datetime-local" {...field} />
                         </FormControl>
@@ -128,9 +126,9 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                     name="description"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>{t('expenses.attachment_form.description_label')}</FormLabel>
+                        <FormLabel>توضیحات (اختیاری)</FormLabel>
                         <FormControl>
-                            <Textarea placeholder={t('expenses.attachment_form.description_placeholder')} {...field} />
+                            <Textarea placeholder="جزئیات بیشتر..." {...field} />
                         </FormControl>
                         </FormItem>
                     )}
@@ -140,7 +138,7 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                     name="receiptNumber"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>{t('expenses.attachment_form.receipt_number_label')}</FormLabel>
+                        <FormLabel>شماره رسید/سند (اختیاری)</FormLabel>
                         <FormControl>
                             <Input placeholder="123456" {...field} />
                         </FormControl>
@@ -152,7 +150,7 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                     name="receiptImage"
                     render={() => (
                         <FormItem>
-                        <FormLabel>{t('expenses.attachment_form.receipt_image_label')}</FormLabel>
+                        <FormLabel>تصویر رسید (اختیاری)</FormLabel>
                         <FormControl>
                             <Input type="file" accept="image/*" onChange={handleFileChange} className="pt-2"/>
                         </FormControl>
@@ -167,14 +165,13 @@ function AttachmentForm({ onAddAttachment }: { onAddAttachment: (data: z.infer<t
                         </Button>
                     </div>
                 )}
-                 <Button type="submit">{t('common.add')}</Button>
+                 <Button type="submit">افزودن سند</Button>
             </form>
         </Form>
     );
 }
 
 function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, 'id'>, attachments: Omit<Attachment, 'id'|'sourceId'|'sourceType'>[]) => void }) {
-    const { t } = useI18n();
     const [attachments, setAttachments] = useState<z.infer<typeof attachmentSchema>[]>([]);
     const form = useForm<z.infer<typeof paymentFormSchema>>({
         resolver: zodResolver(paymentFormSchema),
@@ -197,14 +194,14 @@ function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, '
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="amount" render={({field}) => (
                         <FormItem>
-                            <FormLabel>{t('record_sale.payment_form.amount_label')}</FormLabel>
+                            <FormLabel>مبلغ پرداخت</FormLabel>
                             <FormControl><Input type="number" {...field} /></FormControl>
                             <FormMessage/>
                         </FormItem>
                     )}/>
                      <FormField control={form.control} name="date" render={({field}) => (
                         <FormItem>
-                            <FormLabel>{t('record_sale.payment_form.date_label')}</FormLabel>
+                            <FormLabel>تاریخ و ساعت پرداخت</FormLabel>
                             <FormControl><Input type="datetime-local" {...field} /></FormControl>
                              <FormMessage/>
                         </FormItem>
@@ -212,7 +209,7 @@ function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, '
                 </div>
                 <FormField control={form.control} name="method" render={({field}) => (
                         <FormItem>
-                        <FormLabel>{t('record_sale.payment_form.method_label')}</FormLabel>
+                        <FormLabel>روش پرداخت</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
@@ -228,7 +225,7 @@ function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, '
                 )}/>
                 <Separator />
                 <div className="space-y-2">
-                    <Label>{t('common.attachments')}</Label>
+                    <Label>اسناد پیوست</Label>
                     {attachments.map((att, i) => (
                          <div key={i} className="flex items-center justify-between p-2 border rounded-md bg-muted">
                             <span>{att.receiptNumber || att.description || 'سند'}</span>
@@ -238,14 +235,14 @@ function PaymentForm({ onAddPayment }: { onAddPayment: (payment: Omit<Payment, '
                         </div>
                     ))}
                     <Dialog>
-                        <DialogTrigger asChild><Button type="button" variant="outline" size="sm">{t('common.add_attachment')}</Button></DialogTrigger>
+                        <DialogTrigger asChild><Button type="button" variant="outline" size="sm">افزودن سند</Button></DialogTrigger>
                         <DialogContent>
-                            <DialogHeader><DialogTitle>{t('record_sale.payment_form.add_attachment_title')}</DialogTitle></DialogHeader>
+                            <DialogHeader><DialogTitle>افزودن سند برای این پرداخت</DialogTitle></DialogHeader>
                             <AttachmentForm onAddAttachment={handleAddAttachment} />
                         </DialogContent>
                     </Dialog>
                 </div>
-                <Button type="submit" size="sm">{t('common.add_payment')}</Button>
+                <Button type="submit" size="sm">افزودن پرداخت</Button>
             </form>
         </Form>
     );
@@ -257,8 +254,6 @@ export default function RecordSalePage() {
   const barcodeRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
-  const { t } = useI18n();
-  const locale = useCurrentLocale();
   const { db } = useAppContext();
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -295,8 +290,8 @@ export default function RecordSalePage() {
      if (product.quantity <= 0) {
         toast({
             variant: 'destructive',
-            title: t('record_sale.toasts.out_of_stock.title'),
-            description: t('record_sale.toasts.out_of_stock.description', { name: product.name }),
+            title: 'موجودی تمام شد',
+            description: `موجودی '${product.name}' به اتمام رسیده است.`,
         });
         return;
     }
@@ -307,8 +302,8 @@ export default function RecordSalePage() {
         if (existingItem.quantity >= product.quantity) {
             toast({
                 variant: 'destructive',
-                title: t('record_sale.toasts.stock_limit_reached.title'),
-                description: t('record_sale.toasts.stock_limit_reached.description', { name: product.name }),
+                title: 'تعداد بیش از موجودی',
+                description: `امکان افزودن تعداد بیشتری از '${product.name}' وجود ندارد.`,
             });
             return prevCart;
         }
@@ -329,7 +324,7 @@ export default function RecordSalePage() {
         ];
         }
     });
-  }, [toast, t]);
+  }, [toast]);
 
   const handleBarcodeAdd = async (scannedBarcode: string) => {
     if (!scannedBarcode || !db) return;
@@ -341,15 +336,15 @@ export default function RecordSalePage() {
       } else {
         toast({
           variant: 'destructive',
-          title: t('record_sale.toasts.product_not_found.title'),
-          description: t('record_sale.toasts.product_not_found.description', { barcode: scannedBarcode }),
+          title: 'محصول یافت نشد',
+          description: `محصولی با بارکد ${scannedBarcode} یافت نشد.`,
         });
       }
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: t('record_sale.toasts.db_error.title'),
-        description: t('record_sale.toasts.db_error.description'),
+        title: 'خطای پایگاه داده',
+        description: 'امکان بازیابی اطلاعات محصول وجود نداشت.',
       });
     } finally {
       setBarcode('');
@@ -384,8 +379,8 @@ export default function RecordSalePage() {
     if (cart.length === 0) {
       toast({
         variant: 'destructive',
-        title: t('record_sale.toasts.empty_cart.title'),
-        description: t('record_sale.toasts.empty_cart.description'),
+        title: 'سبد خرید خالی',
+        description: 'برای تکمیل فروش، کالاها را به سبد خرید اضافه کنید.',
       });
       return;
     }
@@ -413,21 +408,21 @@ export default function RecordSalePage() {
         }, newCustomerNameToAdd);
 
         toast({
-            title: t('record_sale.toasts.sale_complete.title'),
-            description: t('record_sale.toasts.sale_complete.description', { total: total.toLocaleString('fa-IR') }),
+            title: 'فروش تکمیل شد!',
+            description: `فروش به مبلغ ${total.toLocaleString('fa-IR')} تومان با موفقیت ثبت شد.`,
             className: 'bg-accent text-accent-foreground border-accent',
         });
         setCart([]);
         setSelectedCustomer(null);
         setCustomerSearch('');
         setPayments([]);
-        router.push(`/${locale}/dashboard`);
+        router.push(`/dashboard`);
     } catch (error) {
       console.error(error);
       toast({
         variant: 'destructive',
-        title: t('record_sale.toasts.error.title'),
-        description: t('record_sale.toasts.error.description'),
+        title: 'خطا',
+        description: 'تکمیل فروش ناموفق بود. موجودی به‌روزرسانی نشد.',
       });
     }
   };
@@ -454,19 +449,19 @@ export default function RecordSalePage() {
       <div className="md:col-span-3">
         <Card>
           <CardHeader>
-            <CardTitle>{t('record_sale.cart_title')}</CardTitle>
-            <CardDescription>{t('record_sale.cart_description')}</CardDescription>
+            <CardTitle>سبد خرید</CardTitle>
+            <CardDescription>محصولات انتخاب شده برای این فروش</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border rounded-md min-h-[300px]">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t('record_sale.cart_table.product')}</TableHead>
-                    <TableHead className="text-center">{t('record_sale.cart_table.quantity')}</TableHead>
-                    <TableHead className="text-left">{t('record_sale.cart_table.price')}</TableHead>
-                    <TableHead className="text-left">{t('record_sale.cart_table.total')}</TableHead>
-                    <TableHead className="text-left">{t('record_sale.cart_table.actions')}</TableHead>
+                    <TableHead>محصول</TableHead>
+                    <TableHead className="text-center">تعداد</TableHead>
+                    <TableHead className="text-left">قیمت</TableHead>
+                    <TableHead className="text-left">جمع کل</TableHead>
+                    <TableHead className="text-left">عملیات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -493,7 +488,7 @@ export default function RecordSalePage() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center h-24">
-                        {t('record_sale.cart_table.empty')}
+                        سبد خرید خالی است
                       </TableCell>
                     </TableRow>
                   )}
@@ -503,32 +498,32 @@ export default function RecordSalePage() {
             <Separator className="my-6"/>
             <Card className="sticky top-8">
                 <CardHeader>
-                    <CardTitle>{t('record_sale.summary.title')}</CardTitle>
+                    <CardTitle>خلاصه و پرداخت</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <div className="grid grid-cols-2 gap-4">
                         <div className="flex justify-between items-baseline text-2xl font-bold">
-                            <span>{t('record_sale.summary.total')}:</span>
+                            <span>جمع کل:</span>
                             <Badge className="text-2xl" variant="secondary">{total.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</Badge>
                         </div>
                          <div className="flex justify-between items-baseline text-lg">
-                            <span className="text-green-600">{t('record_sale.summary.paid')}:</span>
+                            <span className="text-green-600">پرداخت شده:</span>
                             <span className="font-semibold text-green-600">{totalPaid.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
                         </div>
                          <div className="flex justify-between items-baseline text-lg">
-                            <span className="text-red-600">{t('record_sale.summary.remaining')}:</span>
+                            <span className="text-red-600">باقیمانده:</span>
                             <span className="font-semibold text-red-600">{remainingAmount.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
                         </div>
                     </div>
                     <Separator/>
                     <div>
-                        <h4 className="font-medium mb-2">{t('record_sale.summary.new_payment_title')}</h4>
+                        <h4 className="font-medium mb-2">ثبت پرداخت جدید</h4>
                         <PaymentForm onAddPayment={handleAddPayment}/>
                     </div>
 
                      {payments.length > 0 && (
                         <div>
-                             <h4 className="font-medium mb-2">{t('record_sale.summary.registered_payments_title')}</h4>
+                             <h4 className="font-medium mb-2">پرداخت‌های ثبت‌شده</h4>
                             <div className="space-y-2">
                                 {payments.map((p, i) => (
                                     <div key={i} className="flex justify-between items-center p-2 border rounded-md bg-muted">
@@ -545,18 +540,18 @@ export default function RecordSalePage() {
                     <Separator/>
 
                     <div>
-                        <Label>{t('record_sale.summary.customer_label')}</Label>
+                        <Label>مشتری</Label>
                         <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" aria-expanded={isCustomerPopoverOpen} className="w-full justify-between">
-                                    {selectedCustomer ? selectedCustomer.name : t('record_sale.summary.select_customer_placeholder')}
+                                    {selectedCustomer ? selectedCustomer.name : 'انتخاب مشتری...'}
                                     <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[300px] p-0">
                                 <Command>
                                     <CommandInput 
-                                        placeholder={t('record_sale.summary.search_customer_placeholder')}
+                                        placeholder="جستجوی نام یا شماره مشتری..."
                                         value={customerSearch}
                                         onValueChange={setCustomerSearch}
                                     />
@@ -570,7 +565,7 @@ export default function RecordSalePage() {
                                                 className="flex items-center gap-2"
                                             >
                                                 <UserPlus className="h-4 w-4" />
-                                                <span>{t('record_sale.summary.add_new_customer', {name: customerSearch})}</span>
+                                                <span>افزودن مشتری جدید: "{customerSearch}"</span>
                                             </CommandItem>
                                         )}
                                         {filteredCustomers.map((customer) => (
@@ -594,7 +589,7 @@ export default function RecordSalePage() {
                 </CardContent>
                 <CardFooter>
                     <Button className="w-full" size="lg" onClick={completeSale} disabled={!db}>
-                    <ShoppingCart className="mr-2 h-5 w-5" /> {t('record_sale.summary.complete_sale_button')}
+                    <ShoppingCart className="mr-2 h-5 w-5" /> تکمیل فروش
                     </Button>
                 </CardFooter>
             </Card>
@@ -606,14 +601,14 @@ export default function RecordSalePage() {
       <div className="md:col-span-2">
         <Card>
             <CardHeader>
-                <CardTitle>{t('record_sale.product_list.title')}</CardTitle>
-                <CardDescription>{t('record_sale.product_list.description')}</CardDescription>
+                <CardTitle>لیست محصولات</CardTitle>
+                <CardDescription>محصولات را برای افزودن به سبد خرید جستجو و انتخاب کنید.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <div className="relative">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
-                        placeholder={t('record_sale.product_list.search_placeholder')}
+                        placeholder="جستجوی محصول..."
                         value={productSearchTerm}
                         onChange={(e) => setProductSearchTerm(e.target.value)}
                         className="pr-10"
@@ -626,7 +621,7 @@ export default function RecordSalePage() {
                         value={barcode}
                         onChange={(e) => setBarcode(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={t('record_sale.barcode_placeholder')}
+                        placeholder="یا بارکد را اسکن کنید..."
                         className="pr-10"
                     />
                 </div>
@@ -637,13 +632,13 @@ export default function RecordSalePage() {
                             <div key={product.id} onClick={() => handleAddProductToCart(product)} className="flex justify-between items-center p-2 rounded-md hover:bg-muted cursor-pointer">
                                 <div>
                                     <p className="font-semibold">{product.name}</p>
-                                    <p className="text-sm text-muted-foreground">{t('record_sale.product_list.stock_label')}: {product.quantity}</p>
+                                    <p className="text-sm text-muted-foreground">موجودی: {product.quantity}</p>
                                 </div>
                                 <span className="font-mono">{product.price.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
                             </div>
                         ))
                      ) : (
-                         <div className="text-center text-muted-foreground p-4">{t('record_sale.product_list.not_found')}</div>
+                         <div className="text-center text-muted-foreground p-4">محصولی یافت نشد.</div>
                      )}
                    </div>
                 </ScrollArea>

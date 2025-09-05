@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -163,7 +164,7 @@ export default function SalesHistoryPage() {
                                                                 {payment.attachments.map(att => (
                                                                     <li key={att.id} className="border p-2 rounded-md">
                                                                         <p>{att.description || 'سند'}</p>
-                                                                        <p className="text-xs text-muted-foreground">{att.receiptNumber}</p>
+                                                                        <p className="text-xs text-muted-foreground">{new Date(att.date).toLocaleString('fa-IR', { dateStyle: 'short', timeStyle: 'short'})} - {att.receiptNumber}</p>
                                                                         {att.receiptImage && <img src={att.receiptImage} alt="رسید" className="mt-2 max-w-full h-auto rounded" />}
                                                                     </li>
                                                                 ))}

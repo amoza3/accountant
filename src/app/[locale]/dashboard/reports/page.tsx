@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useI18n } from '@/lib/i18n/client';
 import { useAppContext } from '@/components/app-provider';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
@@ -35,7 +34,6 @@ export default function ReportsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('this_month');
   const { toast } = useToast();
   const { db } = useAppContext();
-  const { t } = useI18n();
 
   useEffect(() => {
     if (!db) return;
@@ -51,15 +49,15 @@ export default function ReportsPage() {
       } catch (error) {
         toast({
           variant: 'destructive',
-          title: t('reports.toasts.load_error.title'),
-          description: t('reports.toasts.load_error.description'),
+          title: 'خطا در بارگذاری داده',
+          description: 'بارگذاری اطلاعات فروش و مخارج با مشکل مواجه شد.',
         });
       } finally {
         setIsLoading(false);
       }
     }
     fetchData();
-  }, [toast, db, t]);
+  }, [toast, db]);
   
   const handleGenerateReport = async () => {
     if (!db) return;
@@ -72,8 +70,8 @@ export default function ReportsPage() {
       if (products.length === 0 || salesData.length === 0) {
         toast({
           variant: 'default',
-          title: t('reports.toasts.not_enough_data.title'),
-          description: t('reports.toasts.not_enough_data.description'),
+          title: 'داده کافی نیست',
+          description: 'برای تولید گزارش هوشمند، به داده‌های بیشتری از فروش و موجودی نیاز است.',
         });
         setIsAiLoading(false);
         return;
@@ -96,8 +94,8 @@ export default function ReportsPage() {
       console.error('Failed to generate recommendations:', error);
       toast({
         variant: 'destructive',
-        title: t('reports.toasts.error.title'),
-        description: t('reports.toasts.error.description'),
+        title: 'خطا در تولید گزارش',
+        description: 'متاسفانه تولید گزارش هوشمند با مشکل مواجه شد.',
       });
     } finally {
       setIsAiLoading(false);
@@ -242,23 +240,29 @@ export default function ReportsPage() {
         </Card>
   );
 
+  const timeRangeLabels: Record<TimeRange, string> = {
+    this_week: 'هفته جاری',
+    last_week: 'هفته گذشته',
+    this_month: 'ماه جاری',
+    last_month: 'ماه گذشته',
+    this_year: 'سال جاری',
+    last_year: 'سال گذشته',
+    all: 'کل بازه',
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('reports.title')}</h1>
+        <h1 className="text-2xl font-bold">گزارش‌ها</h1>
         <div className="w-48">
             <Select value={timeRange} onValueChange={(value: TimeRange) => setTimeRange(value)}>
                 <SelectTrigger>
-                    <SelectValue placeholder={t('reports.time_range_placeholder')} />
+                    <SelectValue placeholder="انتخاب بازه زمانی" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="this_week">{t('time_ranges.this_week')}</SelectItem>
-                    <SelectItem value="last_week">{t('time_ranges.last_week')}</SelectItem>
-                    <SelectItem value="this_month">{t('time_ranges.this_month')}</SelectItem>
-                    <SelectItem value="last_month">{t('time_ranges.last_month')}</SelectItem>
-                    <SelectItem value="this_year">{t('time_ranges.this_year')}</SelectItem>
-                    <SelectItem value="last_year">{t('time_ranges.last_year')}</SelectItem>
-                    <SelectItem value="all">{t('time_ranges.all')}</SelectItem>
+                    {Object.entries(timeRangeLabels).map(([key, label]) => (
+                         <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
                 </SelectContent>
             </Select>
         </div>
@@ -277,8 +281,8 @@ export default function ReportsPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('reports.summary_cards.total_sales.title')}</CardTitle>
-                        <CardDescription>{t('reports.summary_cards.total_sales.description')}</CardDescription>
+                        <CardTitle>مجموع فروش</CardTitle>
+                        <CardDescription>در بازه زمانی انتخاب شده</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <p className="text-3xl font-bold">
@@ -288,8 +292,8 @@ export default function ReportsPage() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('reports.summary_cards.gross_profit.title')}</CardTitle>
-                        <CardDescription>{t('reports.summary_cards.gross_profit.description')}</CardDescription>
+                        <CardTitle>سود ناخالص</CardTitle>
+                        <CardDescription>(فروش - قیمت خرید)</CardDescription>
                     </CardHeader>
                     <CardContent>
                          <p className="text-3xl font-bold">
@@ -299,8 +303,8 @@ export default function ReportsPage() {
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle>{t('reports.summary_cards.total_expenses.title')}</CardTitle>
-                        <CardDescription>{t('reports.summary_cards.total_expenses.description')}</CardDescription>
+                        <CardTitle>مجموع مخارج</CardTitle>
+                        <CardDescription>هزینه‌های جاری ثبت‌شده</CardDescription>
                     </CardHeader>
                     <CardContent>
                          <p className="text-3xl font-bold text-destructive">
@@ -310,8 +314,8 @@ export default function ReportsPage() {
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle>{t('reports.summary_cards.net_profit.title')}</CardTitle>
-                        <CardDescription>{t('reports.summary_cards.net_profit.description')}</CardDescription>
+                        <CardTitle>سود خالص</CardTitle>
+                        <CardDescription>(سود ناخالص - مخارج)</CardDescription>
                     </CardHeader>
                     <CardContent>
                          <p className="text-3xl font-bold text-green-600">
@@ -321,8 +325,8 @@ export default function ReportsPage() {
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle>{t('reports.summary_cards.receivables.title')}</CardTitle>
-                        <CardDescription>{t('reports.summary_cards.receivables.description')}</CardDescription>
+                        <CardTitle>مجموع مطالبات</CardTitle>
+                        <CardDescription>مبالغ پرداخت نشده</CardDescription>
                     </CardHeader>
                     <CardContent>
                          <p className="text-3xl font-bold text-orange-500">
@@ -332,7 +336,7 @@ export default function ReportsPage() {
                 </Card>
             </div>
              <div className="grid gap-8">
-                {renderChart(chartData, t('reports.chart.title'))}
+                {renderChart(chartData, 'نمودار جامع فروش، سود و مخارج')}
             </div>
              <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
@@ -341,18 +345,18 @@ export default function ReportsPage() {
                         <Bot className="h-6 w-6" />
                     </div>
                     <div>
-                        <CardTitle>{t('reports.card.title')}</CardTitle>
+                        <CardTitle>دستیار هوشمند انبار</CardTitle>
                         <CardDescription>
-                        {t('reports.card.description')}
+                        برای دریافت پیشنهادهای هوشمند درباره وضعیت موجودی و فروش کلیک کنید.
                         </CardDescription>
                     </div>
                 </div>
                 <Button onClick={handleGenerateReport} disabled={isAiLoading}>
                     {isAiLoading ? (
-                        t('reports.generating_button')
+                        'در حال تولید...'
                     ) : (
                         <>
-                        <Sparkles className="mr-2 h-4 w-4" /> {t('reports.generate_button')}
+                        <Sparkles className="mr-2 h-4 w-4" /> تولید گزارش
                         </>
                     )}
                     </Button>
@@ -372,10 +376,10 @@ export default function ReportsPage() {
                     <div className="flex flex-1 items-center justify-center rounded-lg h-[200px]">
                         <div className="flex flex-col items-center gap-1 text-center">
                             <h3 className="text-2xl font-bold tracking-tight">
-                            {t('reports.card.empty.title')}
+                            آماده برای تحلیل
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                            {t('reports.card.empty.description')}
+                            برای شروع، روی دکمه "تولید گزارش" کلیک کنید.
                             </p>
                         </div>
                     </div>
@@ -388,10 +392,10 @@ export default function ReportsPage() {
                 <CardContent className="flex flex-1 items-center justify-center p-10">
                     <div className="flex flex-col items-center gap-2 text-center">
                         <h3 className="text-2xl font-bold tracking-tight">
-                        {t('reports.no_data.title')}
+                        داده‌ای برای نمایش وجود ندارد
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                        {t('reports.no_data.description')}
+                        هیچ فروش یا هزینه‌ای در بازه زمانی انتخاب شده ثبت نشده است.
                         </p>
                     </div>
                 </CardContent>

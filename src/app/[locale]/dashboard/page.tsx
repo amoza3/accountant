@@ -39,7 +39,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { calculateTotalCostInToman, CURRENCY_SYMBOLS, calculateSellingPrice } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { useI18n, useCurrentLocale } from '@/lib/i18n/client';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -89,7 +88,6 @@ function EditProductForm({
   exchangeRates: ExchangeRate[];
   costTitles: CostTitle[];
 }) {
-  const { t } = useI18n();
   const { toast } = useToast();
   const { db } = useAppContext();
   const [calculatedPrice, setCalculatedPrice] = useState(product.price);
@@ -127,15 +125,15 @@ function EditProductForm({
         price: finalPrice
       });
       toast({
-        title: t('inventory.edit_product.toasts.success.title'),
-        description: t('inventory.edit_product.toasts.success.description', { name: data.name }),
+        title: 'محصول ویرایش شد',
+        description: `'${data.name}' با موفقیت به‌روزرسانی شد.`,
       });
       onSuccess();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: t('inventory.edit_product.toasts.error.title'),
-        description: t('inventory.edit_product.toasts.error.description'),
+        title: 'خطا',
+        description: 'ویرایش محصول ناموفق بود.',
       });
     }
   };
@@ -148,7 +146,7 @@ function EditProductForm({
         name="name"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>{t('inventory.edit_product.form.product_name')}</FormLabel>
+            <FormLabel>نام محصول</FormLabel>
             <FormControl>
               <Input {...field} />
             </FormControl>
@@ -163,7 +161,7 @@ function EditProductForm({
           name="quantity"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('inventory.edit_product.form.quantity')}</FormLabel>
+              <FormLabel>تعداد</FormLabel>
               <FormControl>
                 <Input type="number" {...field} />
               </FormControl>
@@ -176,7 +174,7 @@ function EditProductForm({
           name="lowStockThreshold"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('inventory.edit_product.form.low_stock_threshold')}</FormLabel>
+              <FormLabel>آستانه هشدار موجودی</FormLabel>
               <FormControl>
                 <Input type="number" {...field} />
               </FormControl>
@@ -189,7 +187,7 @@ function EditProductForm({
       <Separator />
 
         <div className="space-y-4">
-            <h3 className="text-lg font-medium">{t('add_product.costs_section.title')}</h3>
+            <h3 className="text-lg font-medium">هزینه‌های محصول</h3>
             {fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
                     <FormField
@@ -197,11 +195,11 @@ function EditProductForm({
                     name={`costs.${index}.title`}
                     render={({ field: selectField }) => (
                         <FormItem className="w-1/3">
-                            <FormLabel>{t('add_product.costs_section.cost_title.label')}</FormLabel>
+                            <FormLabel>عنوان هزینه</FormLabel>
                             <Select onValueChange={selectField.onChange} defaultValue={selectField.value}>
                                 <FormControl>
                                 <SelectTrigger>
-                                    <SelectValue placeholder={t('add_product.costs_section.cost_title.placeholder')} />
+                                    <SelectValue placeholder="یک عنوان انتخاب کنید" />
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
@@ -219,7 +217,7 @@ function EditProductForm({
                     name={`costs.${index}.amount`}
                     render={({ field }) => (
                         <FormItem className="w-1/3">
-                        <FormLabel>{t('add_product.costs_section.amount.label')}</FormLabel>
+                        <FormLabel>مبلغ</FormLabel>
                         <FormControl><Input type="number" placeholder="100" {...field} /></FormControl>
                         <FormMessage />
                         </FormItem>
@@ -230,10 +228,10 @@ function EditProductForm({
                     name={`costs.${index}.currency`}
                     render={({ field }) => (
                         <FormItem className="w-1/3">
-                        <FormLabel>{t('add_product.costs_section.currency.label')}</FormLabel>
+                        <FormLabel>ارز</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
-                            <SelectTrigger><SelectValue placeholder={t('add_product.costs_section.currency.placeholder')} /></SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="ارز را انتخاب کنید" /></SelectTrigger>
                             </FormControl>
                             <SelectContent>
                             {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
@@ -255,7 +253,7 @@ function EditProductForm({
                 variant="outline"
                 onClick={() => append({ id: Date.now().toString(), title: costTitles[0]?.title || '', amount: 0, currency: 'TOMAN' })}
             >
-                <PlusCircle className="mr-2 h-4 w-4" /> {t('add_product.costs_section.add_cost_button')}
+                <PlusCircle className="mr-2 h-4 w-4" /> افزودن هزینه
             </Button>
         </div>
 
@@ -266,7 +264,7 @@ function EditProductForm({
         name="profitMargin"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>{t('inventory.edit_product.form.profit_margin')}</FormLabel>
+            <FormLabel>حاشیه سود (%)</FormLabel>
             <FormControl>
               <Input type="number" {...field} />
             </FormControl>
@@ -276,16 +274,16 @@ function EditProductForm({
       />
 
        <div className="p-4 border rounded-md bg-muted">
-            <p className="text-sm text-muted-foreground">{t('add_product.pricing_section.calculated_price.label')}</p>
+            <p className="text-sm text-muted-foreground">قیمت فروش محاسبه‌شده</p>
             <p className="text-2xl font-bold">
                 {calculatedPrice.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}
             </p>
         </div>
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="outline">{t('common.cancel')}</Button>
+          <Button type="button" variant="outline">لغو</Button>
         </DialogClose>
-        <Button type="submit">{t('common.save_changes')}</Button>
+        <Button type="submit">ذخیره تغییرات</Button>
       </DialogFooter>
     </form>
     </Form>
@@ -305,7 +303,6 @@ function ProductCard({
   exchangeRates: ExchangeRate[];
   costTitles: CostTitle[];
 }) {
-  const { t } = useI18n();
   const isLowStock = product.quantity <= product.lowStockThreshold;
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
@@ -318,31 +315,31 @@ function ProductCard({
     <Card>
       <CardHeader>
         <CardTitle>{product.name}</CardTitle>
-        <CardDescription>{t('inventory.product_card.barcode')}: {product.id}</CardDescription>
+        <CardDescription>بارکد: {product.id}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div>
             <div className="font-semibold text-2xl">{product.price.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</div>
-            <p className="text-xs text-muted-foreground">{t('inventory.product_card.selling_price')}</p>
+            <p className="text-xs text-muted-foreground">قیمت فروش</p>
         </div>
         <Separator/>
         <div className="grid gap-2">
             <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">{t('inventory.product_card.total_cost')}</span>
+                <span className="text-muted-foreground">هزینه تمام‌شده</span>
                 <span className="font-medium">{totalCost.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">{t('inventory.product_card.profit_margin')}</span>
+                <span className="text-muted-foreground">حاشیه سود</span>
                 <span className="font-medium">{product.profitMargin}%</span>
             </div>
              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">{t('inventory.product_card.stock')}</span>
+                <span className="text-muted-foreground">موجودی</span>
                  <div className="flex items-center gap-2">
                     <span className="font-medium">{product.quantity}</span>
                     {isLowStock ? (
-                        <Badge variant="destructive">{t('inventory.product_card.low_stock')}</Badge>
+                        <Badge variant="destructive">موجودی کم</Badge>
                     ) : (
-                        <Badge className="bg-accent text-accent-foreground">{t('inventory.product_card.in_stock')}</Badge>
+                        <Badge className="bg-accent text-accent-foreground">موجود</Badge>
                     )}
                 </div>
             </div>
@@ -357,7 +354,7 @@ function ProductCard({
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{t('inventory.edit_product.title')}</DialogTitle>
+              <DialogTitle>ویرایش محصول</DialogTitle>
             </DialogHeader>
              <EditProductForm 
                 product={product} 
@@ -378,15 +375,15 @@ function ProductCard({
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('common.are_you_sure')}</AlertDialogTitle>
+              <AlertDialogTitle>آیا مطمئن هستید؟</AlertDialogTitle>
               <AlertDialogDescription>
-                {t('inventory.delete_dialog.description', { name: product.name })}
+                این عملیات غیرقابل بازگشت است. محصول '{product.name}' برای همیشه حذف خواهد شد.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogCancel>لغو</AlertDialogCancel>
               <AlertDialogAction onClick={() => onDelete(product.id)}>
-                {t('common.delete')}
+                حذف
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -404,8 +401,6 @@ export default function InventoryPage() {
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
-  const { t } = useI18n();
-  const locale = useCurrentLocale();
   
   const fetchProducts = async () => {
     if (!db) return;
@@ -422,8 +417,8 @@ export default function InventoryPage() {
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: t('inventory.toasts.load_error.title'),
-        description: t('inventory.toasts.load_error.description'),
+        title: 'خطا در بارگذاری',
+        description: 'بارگذاری محصولات از پایگاه داده ناموفق بود.',
       });
     } finally {
       setIsDataLoading(false);
@@ -437,16 +432,16 @@ export default function InventoryPage() {
                 const addedCount = await db.applyRecurringExpenses();
                 if (addedCount > 0) {
                     toast({
-                        title: t('inventory.toasts.recurring_applied.title'),
-                        description: t('inventory.toasts.recurring_applied.description', { count: addedCount }),
+                        title: 'هزینه‌های دوره‌ای ثبت شد',
+                        description: `${addedCount} هزینه دوره‌ای به طور خودکار به لیست مخارج اضافه شد.`,
                     });
                 }
             } catch(error) {
                  console.error("Failed to apply recurring expenses:", error);
                  toast({
                     variant: 'destructive',
-                    title: t('inventory.toasts.recurring_error.title'),
-                    description: t('inventory.toasts.recurring_error.description'),
+                    title: 'خطا در ثبت خودکار هزینه‌ها',
+                    description: 'سیستم نتوانست هزینه‌های دوره‌ای را بررسی و ثبت کند.',
                 });
             }
         };
@@ -460,15 +455,15 @@ export default function InventoryPage() {
     try {
       await db.deleteProduct(id);
       toast({
-        title: t('inventory.toasts.delete_success.title'),
-        description: t('inventory.toasts.delete_success.description'),
+        title: 'محصول حذف شد',
+        description: 'محصول با موفقیت حذف شد.',
       });
       fetchProducts();
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: t('inventory.toasts.delete_error.title'),
-        description: t('inventory.toasts.delete_error.description'),
+        title: 'خطا',
+        description: 'حذف محصول ناموفق بود.',
       });
     }
   };
@@ -506,16 +501,16 @@ export default function InventoryPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">{t('inventory.title')}</h1>
+        <h1 className="text-2xl font-bold">موجودی کالا</h1>
         <div className="flex gap-2">
            <Button onClick={exportToCSV} variant="outline">
             <Download className="mr-2 h-4 w-4" />
-            {t('inventory.export_csv')}
+            خروجی CSV
           </Button>
           <Button asChild>
-            <Link href={`/${locale}/dashboard/add-product`}>
+            <Link href={`/dashboard/add-product`}>
               <PlusCircle className="mr-2 h-4 w-4" />
-              {t('inventory.add_product')}
+              افزودن محصول
             </Link>
           </Button>
         </div>
@@ -523,7 +518,7 @@ export default function InventoryPage() {
 
       <div className="mb-4">
         <Input
-          placeholder={t('inventory.search_placeholder')}
+          placeholder="جستجوی محصول با نام یا بارکد..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm"
@@ -551,13 +546,13 @@ export default function InventoryPage() {
         <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm">
           <div className="flex flex-col items-center gap-1 text-center">
             <h3 className="text-2xl font-bold tracking-tight">
-              {t('inventory.no_products.title')}
+              محصولی یافت نشد
             </h3>
             <p className="text-sm text-muted-foreground">
-              {t('inventory.no_products.description')}
+              برای شروع، اولین محصول خود را اضافه کنید.
             </p>
             <Button className="mt-4" asChild>
-              <Link href={`/${locale}/dashboard/add-product`}>{t('inventory.no_products.add_product_button')}</Link>
+              <Link href={`/dashboard/add-product`}>افزودن محصول</Link>
             </Button>
           </div>
         </div>

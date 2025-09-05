@@ -1,9 +1,9 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { PlusCircle, Download, Trash2, Pencil, Loader2 } from 'lucide-react';
-
+import { PlusCircle, Download, Trash2, Pencil } from 'lucide-react';
 import type { Product, ExchangeRate, CostTitle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +60,6 @@ import {
 } from '@/components/ui/select';
 import { useAppContext } from '@/components/app-provider';
 import { Skeleton } from '@/components/ui/skeleton';
-
 
 const productSchema = z.object({
   id: z.string().min(1, 'بارکد الزامی است'),
@@ -128,7 +127,7 @@ function EditProductForm({
       });
       toast({
         title: 'محصول ویرایش شد',
-        description: `${data.name} با موفقیت به‌روزرسانی شد.`,
+        description: `'${data.name}' با موفقیت به‌روزرسانی شد.`,
       });
       onSuccess();
     } catch (error) {
@@ -143,19 +142,6 @@ function EditProductForm({
   return (
     <Form {...form}>
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto p-4">
-      <FormField
-        control={form.control}
-        name="id"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>بارکد (شناسه)</FormLabel>
-            <FormControl>
-              <Input {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
       <FormField
         control={form.control}
         name="name"
@@ -239,24 +225,24 @@ function EditProductForm({
                     )}
                     />
                     <FormField
-                    control={form.control}
-                    name={`costs.${index}.currency`}
-                    render={({ field }) => (
+                      control={form.control}
+                      name={`costs.${index}.currency`}
+                      render={({ field }) => (
                         <FormItem className="w-1/3">
-                        <FormLabel>ارز</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormLabel>ارز</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
-                            <SelectTrigger><SelectValue placeholder="ارز را انتخاب کنید" /></SelectTrigger>
+                              <SelectTrigger><SelectValue placeholder="ارز را انتخاب کنید" /></SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                            {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
+                              {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
                                 <SelectItem key={code} value={code}>{code} ({symbol})</SelectItem>
-                            ))}
+                              ))}
                             </SelectContent>
-                        </Select>
-                        <FormMessage />
+                          </Select>
+                          <FormMessage />
                         </FormItem>
-                    )}
+                      )}
                     />
                     <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
                     <Trash2 className="h-4 w-4" />
@@ -310,7 +296,7 @@ function ProductCard({
   onDelete,
   onUpdate,
   exchangeRates,
-  costTitles
+  costTitles,
 }: {
   product: Product;
   onDelete: (id: string) => void;
@@ -371,7 +357,7 @@ function ProductCard({
             <DialogHeader>
               <DialogTitle>ویرایش محصول</DialogTitle>
             </DialogHeader>
-            <EditProductForm 
+             <EditProductForm 
                 product={product} 
                 exchangeRates={exchangeRates} 
                 costTitles={costTitles}
@@ -416,15 +402,15 @@ export default function InventoryPage() {
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
-
+  
   const fetchProducts = async () => {
     if (!db) return;
     setIsDataLoading(true);
     try {
       const [allProducts, rates, titles] = await Promise.all([
-        db.getAllProducts(), 
+        db.getAllProducts(),
         db.getExchangeRates(),
-        db.getCostTitles()
+        db.getCostTitles(),
       ]);
       setProducts(allProducts.sort((a, b) => a.name.localeCompare(b.name)));
       setExchangeRates(rates);
@@ -432,11 +418,11 @@ export default function InventoryPage() {
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'خطا',
+        title: 'خطا در بارگذاری',
         description: 'بارگذاری محصولات از پایگاه داده ناموفق بود.',
       });
     } finally {
-        setIsDataLoading(false);
+      setIsDataLoading(false);
     }
   };
 
@@ -463,7 +449,7 @@ export default function InventoryPage() {
         
         checkRecurringExpenses().then(() => fetchProducts());
     }
-  }, [db]);
+  }, [db, toast]);
 
   const handleDelete = async (id: string) => {
     if (!db) return;
