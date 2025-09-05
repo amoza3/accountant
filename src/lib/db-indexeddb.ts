@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import type { Product, Sale, ExchangeRate, CostTitle, Customer, Expense, RecurringExpense, Employee, Attachment, Payment, AppSettings, UserProfile } from '@/lib/types';
@@ -425,33 +426,19 @@ export const IndexedDBDataProvider: DataProvider = {
     });
   },
   addSale: async (saleData, newCustomerName) => {
+    const rates = await getExchangeRates();
     const db = await openDB();
-    const tx = db.transaction([SALE_STORE, PRODUCT_STORE, CUSTOMER_STORE, SETTINGS_STORE], 'readwrite');
-    const saleStore = tx.objectStore(SALE_STORE);
-    const productStore = tx.objectStore(PRODUCT_STORE);
-    const customerStore = tx.objectStore(CUSTOMER_STORE);
-
-    let saleToSave: Sale = { ...saleData, id: Date.now(), items: [] };
 
     if (newCustomerName && !saleData.customerId) {
-        const newCustomer: Customer = {
-            id: Date.now().toString(),
-            name: newCustomerName,
-            phone: '',
-            address: ''
-        };
-        const addCustomerReq = customerStore.add(newCustomer);
-        await new Promise<void>((resolve, reject) => {
-            addCustomerReq.onsuccess = () => {
-                saleToSave.customerId = newCustomer.id;
-                saleToSave.customerName = newCustomer.name;
-                resolve();
-            };
-            addCustomerReq.onerror = () => reject(addCustomerReq.error);
-        });
+        saleData.customerId = await addCustomer({ name: newCustomerName });
+        saleData.customerName = newCustomerName;
     }
 
-    const rates = await getExchangeRates();
+    const tx = db.transaction([SALE_STORE, PRODUCT_STORE], 'readwrite');
+    const saleStore = tx.objectStore(SALE_STORE);
+    const productStore = tx.objectStore(PRODUCT_STORE);
+    
+    let saleToSave: Sale = { ...saleData, id: Date.now(), items: [] };
 
     const productUpdatePromises = saleData.items.map(item => {
         return new Promise<void>((resolveUpdate, rejectUpdate) => {
@@ -485,6 +472,7 @@ export const IndexedDBDataProvider: DataProvider = {
     await Promise.all(productUpdatePromises);
     
     saleStore.add(saleToSave);
+
     return new Promise((resolve, reject) => {
          tx.oncomplete = () => resolve();
          tx.onerror = () => reject(tx.error);
