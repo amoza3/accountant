@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -63,7 +64,7 @@ const firebaseConfigSchema = z.object({
 
 function ExchangeRatesForm() {
   const { toast } = useToast();
-  const { db } = useAppContext();
+  const { db, setGlobalLoading } = useAppContext();
   const form = useForm<z.infer<typeof exchangeRatesSchema>>({
     resolver: zodResolver(exchangeRatesSchema),
     defaultValues: {
@@ -74,11 +75,13 @@ function ExchangeRatesForm() {
   useEffect(() => {
     if (!db) return;
     async function loadRates() {
+      setGlobalLoading(true);
       const rates = await db.getExchangeRates();
       form.reset({ rates });
+      setGlobalLoading(false);
     }
     loadRates();
-  }, [form, db]);
+  }, [form, db, setGlobalLoading]);
 
   const onSubmit = async (data: z.infer<typeof exchangeRatesSchema>) => {
     if (!db) return;
@@ -124,7 +127,7 @@ function ExchangeRatesForm() {
 
 function CostTitlesForm() {
   const { toast } = useToast();
-  const { db } = useAppContext();
+  const { db, setGlobalLoading } = useAppContext();
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
   const form = useForm<z.infer<typeof costTitleSchema>>({
     resolver: zodResolver(costTitleSchema),
@@ -133,9 +136,11 @@ function CostTitlesForm() {
 
   const fetchCostTitles = useCallback(async () => {
     if (!db) return;
+    setGlobalLoading(true);
     const titles = await db.getCostTitles();
     setCostTitles(titles);
-  }, [db]);
+    setGlobalLoading(false);
+  }, [db, setGlobalLoading]);
 
   useEffect(() => {
     fetchCostTitles();
@@ -219,7 +224,7 @@ function CostTitlesForm() {
 
 function EmployeeForm() {
   const { toast } = useToast();
-  const { db } = useAppContext();
+  const { db, setGlobalLoading } = useAppContext();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const form = useForm<z.infer<typeof employeeSchema>>({
     resolver: zodResolver(employeeSchema),
@@ -228,9 +233,11 @@ function EmployeeForm() {
 
   const fetchEmployees = useCallback(async () => {
     if (!db) return;
+    setGlobalLoading(true);
     const allEmployees = await db.getAllEmployees();
     setEmployees(allEmployees);
-  }, [db]);
+    setGlobalLoading(false);
+  }, [db, setGlobalLoading]);
 
   useEffect(() => {
     fetchEmployees();
@@ -474,6 +481,20 @@ function FirebaseSettingsForm() {
 }
 
 export default function SettingsPage() {
+  const { isLoading } = useAppContext();
+  
+  if(isLoading) {
+      return (
+          <div className="max-w-4xl mx-auto space-y-6">
+              <Skeleton className="h-10 w-32" />
+              <div className="space-y-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-64 w-full" />
+              </div>
+          </div>
+      )
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">تنظیمات</h1>
@@ -544,3 +565,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

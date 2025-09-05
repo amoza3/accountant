@@ -395,17 +395,16 @@ function ProductCard({
 }
 
 export default function InventoryPage() {
-  const { db, isLoading: isDbLoading } = useAppContext();
+  const { db, isLoading, setGlobalLoading } = useAppContext();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
   const [costTitles, setCostTitles] = useState<CostTitle[]>([]);
-  const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
   
   const fetchProducts = async () => {
     if (!db) return;
-    setIsDataLoading(true);
+    setGlobalLoading(true);
     try {
       const [allProducts, rates, titles] = await Promise.all([
         db.getAllProducts(),
@@ -422,7 +421,7 @@ export default function InventoryPage() {
         description: 'بارگذاری محصولات از پایگاه داده ناموفق بود.',
       });
     } finally {
-      setIsDataLoading(false);
+      setGlobalLoading(false);
     }
   };
 
@@ -449,7 +448,7 @@ export default function InventoryPage() {
         
         checkRecurringExpenses().then(() => fetchProducts());
     }
-  }, [db, toast]);
+  }, [db]);
 
   const handleDelete = async (id: string) => {
     if (!db) return;
@@ -496,8 +495,6 @@ export default function InventoryPage() {
         product.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [products, searchTerm]);
-
-  const isLoading = isDbLoading || isDataLoading;
 
   return (
     <div className="flex flex-col h-full">
@@ -561,3 +558,5 @@ export default function InventoryPage() {
     </div>
   );
 }
+
+    

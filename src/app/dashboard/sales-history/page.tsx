@@ -27,6 +27,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Paperclip } from 'lucide-react';
 import { useAppContext } from '@/components/app-provider';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 const paymentMethodLabels: Record<PaymentMethod, string> = {
     CASH: 'نقد',
@@ -41,11 +43,12 @@ type SaleWithDetails = Sale & {
 export default function SalesHistoryPage() {
   const [salesWithDetails, setSalesWithDetails] = useState<SaleWithDetails[]>([]);
   const { toast } = useToast();
-  const { db } = useAppContext();
+  const { db, isLoading, setGlobalLoading } = useAppContext();
 
   useEffect(() => {
     if (!db) return;
     async function fetchSales() {
+      setGlobalLoading(true);
       try {
         const allSales = await db.getAllSales();
         const salesDetails: SaleWithDetails[] = await Promise.all(
@@ -65,12 +68,33 @@ export default function SalesHistoryPage() {
           title: 'خطا',
           description: 'بارگذاری تاریخچه فروش ناموفق بود.',
         });
+      } finally {
+        setGlobalLoading(false);
       }
     }
     fetchSales();
-  }, [toast, db]);
+  }, [db]);
 
   const totalPaid = (sale: SaleWithDetails) => sale.payments.reduce((acc, p) => acc + p.amount, 0);
+  
+  if (isLoading) {
+    return (
+        <div className="space-y-4">
+             <Skeleton className="h-10 w-48" />
+             <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/3" />
+                    <Skeleton className="h-4 w-2/3" />
+                </CardHeader>
+                 <CardContent className="space-y-2">
+                     <Skeleton className="h-12 w-full" />
+                     <Skeleton className="h-12 w-full" />
+                     <Skeleton className="h-12 w-full" />
+                 </CardContent>
+            </Card>
+        </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -203,3 +227,5 @@ export default function SalesHistoryPage() {
     </div>
   );
 }
+
+    

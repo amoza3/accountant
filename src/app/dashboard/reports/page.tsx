@@ -31,15 +31,14 @@ export default function ReportsPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<TimeRange>('this_month');
   const { toast } = useToast();
-  const { db } = useAppContext();
+  const { db, isLoading, setGlobalLoading } = useAppContext();
+  const [timeRange, setTimeRange] = useState<TimeRange>('this_month');
 
   useEffect(() => {
     if (!db) return;
     async function fetchData() {
-      setIsLoading(true);
+      setGlobalLoading(true);
       try {
         const [allSales, allExpenses, allProducts] = await Promise.all([db.getAllSales(), db.getAllExpenses(), db.getAllProducts()]);
         const paymentIds = allSales.flatMap(s => s.paymentIds || []);
@@ -54,11 +53,11 @@ export default function ReportsPage() {
           description: 'بارگذاری اطلاعات فروش و مخارج با مشکل مواجه شد.',
         });
       } finally {
-        setIsLoading(false);
+        setGlobalLoading(false);
       }
     }
     fetchData();
-  }, [toast, db]);
+  }, [db]);
   
   const handleGenerateReport = async () => {
     if (!db) return;
@@ -405,3 +404,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
