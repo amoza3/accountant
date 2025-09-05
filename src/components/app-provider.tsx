@@ -40,7 +40,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isGlobalLoading, setGlobalLoading] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [settings, setSettings] = useState<AppSettings>({ shopName: 'ایزی استاک' });
+  const [settings, setSettings] = useState<AppSettings>({ shopName: 'حسابدار آنلاین آموزا' });
 
   useEffect(() => {
     const savedProvider = (localStorage.getItem('storageType') as StorageType) || 'local';

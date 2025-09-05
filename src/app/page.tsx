@@ -60,7 +60,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-             <Logo>ایزی استاک</Logo>
+             <Logo>حسابدار آنلاین آموزا</Logo>
           </div>
           <CardTitle className="text-2xl">ورود به حساب کاربری</CardTitle>
           <CardDescription>برای دسترسی به داشبورد، با حساب گوگل خود وارد شوید.</CardDescription>

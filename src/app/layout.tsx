@@ -5,7 +5,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppProvider } from '@/components/app-provider';
 
 export const metadata: Metadata = {
-  title: 'ایزی استاک',
+  title: 'حسابدار آنلاین آموزا',
   description: 'مدیریت ساده موجودی',
 };
 

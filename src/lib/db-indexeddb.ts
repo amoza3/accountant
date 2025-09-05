@@ -542,7 +542,7 @@ export const IndexedDBDataProvider: DataProvider = {
         const store = getStore(SETTINGS_STORE, 'readonly');
         const request = store.get(APP_SETTINGS_KEY);
         request.onsuccess = () => {
-            resolve(request.result?.value || { shopName: 'ایزی استاک' });
+            resolve(request.result?.value || { shopName: 'حسابدار آنلاین آموزا' });
         };
         request.onerror = () => reject(request.error);
     });

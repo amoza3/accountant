@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <SidebarTrigger>
                   <PanelLeft className="h-6 w-6" />
               </SidebarTrigger>
-              <Logo>{settings.shopName || 'ایزی استاک'}</Logo>
+              <Logo>{settings.shopName || 'حسابدار آنلاین آموزا'}</Logo>
           </header>
           <GlobalProgressBar />
           <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">

@@ -107,7 +107,7 @@ export function MainSidebar() {
   return (
     <Sidebar className="border-l border-r-0" dir="rtl" side="right">
       <SidebarHeader className="border-b border-b-0 border-t">
-        <Logo>{settings.shopName || 'ایزی استاک'}</Logo>
+        <Logo>{settings.shopName || 'حسابدار آنلاین آموزا'}</Logo>
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>

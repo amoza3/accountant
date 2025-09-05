@@ -126,7 +126,7 @@ export const FirestoreDataProvider = (userId: string, isSuperAdmin: boolean): Da
         const db = getDb();
         const docRef = doc(db, SETTINGS_COLLECTION, 'appSettings');
         const docSnap = await getDoc(docRef);
-        return docSnap.exists() ? (docSnap.data() as AppSettings) : { shopName: 'ایزی استاک' };
+        return docSnap.exists() ? (docSnap.data() as AppSettings) : { shopName: 'حسابدار آنلاین آموزا' };
     },
     saveAppSettings: async (settings) => {
         const db = getDb();
