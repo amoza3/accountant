@@ -5,7 +5,8 @@ import { useRef, useEffect, useState } from 'react';
 import { useForm, useFieldArray, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Barcode, PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { Barcode, PlusCircle, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -46,6 +47,7 @@ const productSchema = z.object({
   quantity: z.coerce.number().min(0, 'تعداد نمی‌تواند منفی باشد'),
   lowStockThreshold: z.coerce.number().min(0, 'آستانه نمی‌تواند منفی باشد'),
   profitMargin: z.coerce.number().min(0, 'حاشیه سود نمی‌تواند منفی باشد'),
+  imageUrl: z.string().optional(),
   costs: z.array(
     z.object({
       id: z.string(),
@@ -85,6 +87,7 @@ export default function AddProductPage() {
       lowStockThreshold: 10,
       profitMargin: 20,
       costs: [],
+      imageUrl: '',
     },
   });
 
@@ -103,6 +106,22 @@ export default function AddProductPage() {
     const newPrice = calculateSellingPrice(productData, exchangeRates);
     setCalculatedPrice(newPrice);
   }, [watchedValues, exchangeRates]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && db) {
+      try {
+        const base64 = await db.uploadFile(file);
+        form.setValue('imageUrl', base64);
+      } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'خطا در آپلود تصویر',
+            description: 'نتوانستیم تصویر را آپلود کنیم. لطفا دوباره تلاش کنید.',
+        });
+      }
+    }
+  }
 
   const onSubmit: SubmitHandler<z.infer<typeof productSchema>> = async (data) => {
     if (!db) return;
@@ -144,6 +163,7 @@ export default function AddProductPage() {
   };
 
   const totalCost = calculateTotalCostInToman(watchedValues.costs as ProductCost[], exchangeRates);
+  const imageUrl = form.watch('imageUrl');
 
   return (
     <div className="flex justify-center items-start pt-10">
@@ -222,6 +242,43 @@ export default function AddProductPage() {
                   />
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Image Upload Section */}
+              <div className="space-y-2">
+                 <FormLabel>تصویر محصول</FormLabel>
+                {imageUrl ? (
+                    <div className="relative w-32 h-32">
+                        <Image src={imageUrl} alt="پیش‌نمایش محصول" layout="fill" className="rounded-md object-cover" />
+                        <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 z-10" onClick={() => form.setValue('imageUrl', '')}>
+                            <X className="h-4 w-4"/>
+                        </Button>
+                    </div>
+                ) : (
+                    <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={() => (
+                        <FormItem>
+                        <FormControl>
+                             <div className="flex items-center justify-center w-full">
+                                <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-card">
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                        <ImageIcon className="w-8 h-8 mb-4 text-muted-foreground" />
+                                        <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">برای آپلود کلیک کنید</span> یا فایل را بکشید</p>
+                                    </div>
+                                    <Input id="dropzone-file" type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                </label>
+                            </div> 
+                        </FormControl>
+                         <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                )}
+              </div>
+
 
               <Separator />
 

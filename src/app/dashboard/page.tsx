@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { PlusCircle, Download, Trash2, Pencil } from 'lucide-react';
+import Image from 'next/image';
+import { PlusCircle, Download, Trash2, Pencil, BarChart2 } from 'lucide-react';
 import type { Product, ExchangeRate, CostTitle } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +68,7 @@ const productSchema = z.object({
   quantity: z.coerce.number().min(0, 'تعداد نمی‌تواند منفی باشد'),
   lowStockThreshold: z.coerce.number().min(0, 'آستانه نمی‌تواند منفی باشد'),
   profitMargin: z.coerce.number().min(0, 'حاشیه سود نمی‌تواند منفی باشد'),
+   imageUrl: z.string().optional(),
   costs: z.array(
     z.object({
       id: z.string(),
@@ -313,12 +315,21 @@ function ProductCard({
   );
 
   return (
-    <Card>
+    <Card className="flex flex-col">
+       {product.imageUrl ? (
+        <div className="relative w-full h-40">
+           <Image src={product.imageUrl} alt={product.name} layout="fill" className="object-cover rounded-t-lg" />
+        </div>
+      ) : (
+         <div className="flex items-center justify-center h-40 bg-muted rounded-t-lg">
+          <ImageIcon className="w-12 h-12 text-muted-foreground" />
+        </div>
+      )}
       <CardHeader>
         <CardTitle>{product.name}</CardTitle>
         <CardDescription>بارکد: {product.id}</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4">
+      <CardContent className="grid gap-4 flex-grow">
         <div>
             <div className="font-semibold text-2xl">{product.price.toLocaleString('fa-IR')} {CURRENCY_SYMBOLS.TOMAN}</div>
             <p className="text-xs text-muted-foreground">قیمت فروش</p>
@@ -340,13 +351,18 @@ function ProductCard({
                     {isLowStock ? (
                         <Badge variant="destructive">موجودی کم</Badge>
                     ) : (
-                        <Badge className="bg-accent text-accent-foreground">موجود</Badge>
+                        <Badge variant="secondary">موجود</Badge>
                     )}
                 </div>
             </div>
         </div>
       </CardContent>
       <CardFooter className="flex justify-end gap-2">
+         <Button variant="ghost" size="icon" asChild>
+            <Link href={`/dashboard/products/${product.id}`}>
+              <BarChart2 className="h-4 w-4" />
+            </Link>
+          </Button>
          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="icon">
@@ -499,7 +515,7 @@ export default function InventoryPage() {
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
+          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-96 w-full" />)}
       </div>
     )
   }
@@ -562,5 +578,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
-    

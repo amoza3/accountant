@@ -28,6 +28,7 @@ export interface Product {
   lowStockThreshold: number;
   costs: ProductCost[];
   profitMargin: number; // Percentage
+  imageUrl?: string; // Base64 or URL
 }
 
 export interface Customer {

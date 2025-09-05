@@ -107,7 +107,7 @@ export function MainSidebar() {
 
   const isLinkActive = (href: string) => {
     if (href.endsWith('/dashboard')) {
-      return pathname === href || pathname === '/dashboard';
+      return pathname === href || pathname.startsWith('/dashboard/products') ;
     }
     return pathname.startsWith(href);
   };
